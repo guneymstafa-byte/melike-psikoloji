@@ -621,7 +621,7 @@ export default function Home() {
                 </div>
 
                 <div className="flex items-center gap-4 p-4 rounded-2xl bg-[#FAF7F2] border border-[#E8DFD8]">
-                  <Phone className="w-5 h-5 text-[#446A5E] shrink-0" />
+                  <Phone className="w-5 h-5 text-[#446A5E]" />
                   <div>
                     <p className="text-xs text-stone-500 font-medium">Telefon & WhatsApp</p>
                     <a href="tel:05306560632" className="text-sm font-bold text-[#192923] hover:text-[#446A5E] transition-colors">
@@ -631,7 +631,7 @@ export default function Home() {
                 </div>
 
                 <div className="flex items-center gap-4 p-4 rounded-2xl bg-[#FAF7F2] border border-[#E8DFD8]">
-                  <Mail className="w-5 h-5 text-[#446A5E] shrink-0" />
+                  <Mail className="w-5 h-5 text-[#446A5E]" />
                   <div>
                     <p className="text-xs text-stone-500 font-medium">E-Posta</p>
                     <a href="mailto:melikeermumcu0@gmail.com" className="text-sm font-bold text-[#192923] hover:text-[#446A5E] transition-colors">
@@ -641,7 +641,7 @@ export default function Home() {
                 </div>
 
                 <div className="flex items-center gap-4 p-4 rounded-2xl bg-[#FAF7F2] border border-[#E8DFD8]">
-                  <Clock className="w-5 h-5 text-[#446A5E] shrink-0" />
+                  <Clock className="w-5 h-5 text-[#446A5E]" />
                   <div>
                     <p className="text-xs text-stone-500 font-medium">Çalışma Saatleri</p>
                     <p className="text-sm font-bold text-[#192923]">Pazartesi - Cumartesi: 09:00 - 19:00</p>
