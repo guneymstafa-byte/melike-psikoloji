@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { supabase } from '../../../lib/supabase';
 import Link from 'next/link';
-import { ArrowLeft, Clock } from 'lucide-react';
+import { ArrowLeft, Clock, Calendar } from 'lucide-react';
 
 interface PostData {
   id: string;
@@ -13,6 +13,7 @@ interface PostData {
   excerpt: string;
   content: string;
   read_time?: string;
+  created_at?: string;
 }
 
 export default function BlogPostDetail() {
@@ -23,7 +24,6 @@ export default function BlogPostDetail() {
   useEffect(() => {
     async function fetchPost() {
       if (!params?.slug) return;
-      
       const slugVal = Array.isArray(params.slug) ? params.slug[0] : params.slug;
 
       const { data } = await supabase
@@ -50,10 +50,12 @@ export default function BlogPostDetail() {
 
   if (!post) {
     return (
-      <div className="min-h-screen bg-[#FAF7F2] flex flex-col items-center justify-center text-[#192923] p-4">
+      <div className="min-h-screen bg-[#FAF7F2] flex flex-col items-center justify-center text-[#192923] p-4 font-sans">
         <h2 className="text-xl font-bold mb-2">Makale Bulunamadı</h2>
-        <p className="text-xs text-stone-500 mb-4">Aradığınız makale mevcut olmayabilir veya silinmiş olabilir.</p>
-        <Link href="/" className="text-xs text-[#446A5E] font-semibold underline">Ana Sayfaya Dön</Link>
+        <p className="text-xs text-stone-500 mb-4">Aradığınız makale mevcut olmayabilir veya yayından kaldırılmış olabilir.</p>
+        <Link href="/" className="text-xs text-[#446A5E] font-semibold underline">
+          Ana Sayfaya Dön
+        </Link>
       </div>
     );
   }
@@ -61,7 +63,10 @@ export default function BlogPostDetail() {
   return (
     <div className="min-h-screen bg-[#FAF7F2] text-[#192923] font-sans selection:bg-[#D6AFA3]">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-12">
-        <Link href="/" className="inline-flex items-center gap-2 text-xs font-semibold text-[#446A5E] hover:text-[#335047] mb-8">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 text-xs font-semibold text-[#446A5E] hover:text-[#335047] mb-8"
+        >
           <ArrowLeft className="w-4 h-4" /> Ana Sayfaya Dön
         </Link>
 
