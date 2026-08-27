@@ -6,24 +6,21 @@ import {
   Menu,
   X,
   ArrowRight,
-  Clock,
   MapPin,
   GraduationCap,
-  Sparkles,
   Check,
   Phone,
   Mail,
-  Calendar,
   Loader2,
   CheckCircle2,
   AlertCircle,
   ShieldCheck,
   Brain,
   Baby,
-  FileText,
-  HelpCircle,
   ChevronDown,
-  Award
+  Award,
+  BookOpen,
+  Calendar
 } from 'lucide-react';
 
 export default function Home() {
@@ -56,7 +53,7 @@ export default function Home() {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || 'Bir hata olustu.');
+        throw new Error(data.error || 'Bir hata oluştu.');
       }
 
       setStatus('success');
@@ -73,10 +70,37 @@ export default function Home() {
       if (err instanceof Error) {
         setErrorMessage(err.message);
       } else {
-        setErrorMessage('Randevu talebi iletilemedi. Lutfen telefon veya WhatsApp ile ulasiniz.');
+        setErrorMessage('Randevu talebi iletilemedi. Lütfen telefon veya WhatsApp ile ulaşınız.');
       }
     }
   };
+
+  const blogPosts = [
+    {
+      id: 1,
+      title: "Kaygıyı Anlamak ve Yönetmek: Bilişsel Bir Bakış",
+      category: "Yetişkin Terapisi",
+      date: "Ağustos 2026",
+      readTime: "4 dk okuma",
+      excerpt: "Sürekli endişe ve kaygı halinde zihnimizin ürettiği otomatik düşünceleri fark etmek, kaygıyla başa çıkmanın ilk adımıdır."
+    },
+    {
+      id: 2,
+      title: "Çocukların Doğal Dili: Oyun Terapisi Neden Önemlidir?",
+      category: "Çocuk & Oyun Terapisi",
+      date: "Ağustos 2026",
+      readTime: "5 dk okuma",
+      excerpt: "Yetişkinler duygularını kelimelerle ifade ederken, çocuklar dünyayı ve içsel çatışmalarını oyunlar ve oyuncaklar aracılığıyla anlatır."
+    },
+    {
+      id: 3,
+      title: "Psikolojik Testler Bize Ne Söyler, Ne Söylemez?",
+      category: "Klinik Değerlendirme",
+      date: "Temmuz 2026",
+      readTime: "3 dk okuma",
+      excerpt: "MMPI ve gelişim testleri bir etiket değil; bireyi daha derinlemesine tanıyıp doğru bir terapi haritası çizmenin araçlarıdır."
+    }
+  ];
 
   const faqs = [
     {
@@ -135,6 +159,7 @@ export default function Home() {
             <a href="#testler" className="hover:text-[#446A5E] transition-colors">Test & Değerlendirme</a>
             <a href="#surec" className="hover:text-[#446A5E] transition-colors">Terapi Süreci</a>
             <a href="#egitimler" className="hover:text-[#446A5E] transition-colors">Eğitimler</a>
+            <a href="#blog" className="hover:text-[#446A5E] transition-colors">Yazılar & Blog</a>
             <a href="#sss" className="hover:text-[#446A5E] transition-colors">SSS</a>
           </nav>
 
@@ -163,13 +188,14 @@ export default function Home() {
             <a href="#testler" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-sm font-medium text-stone-800">Test & Değerlendirme</a>
             <a href="#surec" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-sm font-medium text-stone-800">Terapi Süreci</a>
             <a href="#egitimler" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-sm font-medium text-stone-800">Eğitimler</a>
+            <a href="#blog" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-sm font-medium text-stone-800">Yazılar & Blog</a>
             <a href="#sss" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-sm font-medium text-stone-800">SSS</a>
             <a href="#randevu" onClick={() => setMobileMenuOpen(false)} className="block text-center py-3 rounded-xl bg-[#446A5E] text-white font-medium">Randevu Oluştur</a>
           </div>
         )}
       </header>
 
-      {/* 3. Hero Bölümü (Profesyonel Fotoğraf Odaklı Tasarım) */}
+      {/* 3. Hero Bölümü */}
       <section className="relative overflow-hidden pt-10 pb-20 md:py-20 border-b border-[#E8DFD8]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-12 gap-12 lg:gap-8 items-center">
@@ -215,7 +241,7 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Sağ Profesyonel Görsel & Floating Badges */}
+            {/* Sağ Profesyonel Görsel */}
             <div className="lg:col-span-5 flex justify-center">
               <div className="relative w-full max-w-sm">
                 
@@ -236,18 +262,7 @@ export default function Home() {
                   {/* Fotoğraf Üzeri Alt İsim Etiketi */}
                   <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-[#192923]/90 via-[#192923]/50 to-transparent p-5 text-white">
                     <h3 className="text-lg font-bold">Melike Ermumcu</h3>
-                    <p className="text-xs text-[#D6AFA3] font-medium">Uzm. Klinik Psikolog &bull; Oda Psikoloji</p>
-                  </div>
-                </div>
-
-                {/* Floating Badge: Seans Bilgisi */}
-                <div className="absolute -top-4 -left-4 bg-white/95 backdrop-blur-sm border border-[#E8DFD8] py-2.5 px-4 rounded-2xl shadow-lg flex items-center gap-2.5">
-                  <div className="p-1.5 rounded-lg bg-[#E5ECE9] text-[#446A5E]">
-                    <Clock className="w-4 h-4" />
-                  </div>
-                  <div className="text-[11px] leading-tight">
-                    <span className="font-bold text-[#192923] block">Seans Süresi</span>
-                    <span className="text-stone-500">45 Dakika</span>
+                    <p className="text-xs text-[#D6AFA3] font-medium">Uzm. Klinik Psikolog &bull; Alsancak, İzmir</p>
                   </div>
                 </div>
 
@@ -508,7 +523,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 8. Terapi Süreci (Koyu Kontrast Bölümü) */}
+      {/* 8. Terapi Süreci */}
       <section id="surec" className="py-20 bg-[#192923] text-white">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           
@@ -614,7 +629,67 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 10. Sıkça Sorulan Sorular (SSS) */}
+      {/* 10. Yazılar & Blog Bölümü */}
+      <section id="blog" className="py-20 bg-[#FAF7F2] border-t border-[#E8DFD8]">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          
+          <div className="flex flex-col md:flex-row md:items-end justify-between mb-14 gap-4">
+            <div>
+              <span className="text-xs font-bold uppercase tracking-widest text-[#446A5E]">Psikoloji & Farkındalık</span>
+              <h2 className="text-3xl font-extrabold text-[#192923] mt-1">Yazılar & Makaleler</h2>
+              <p className="text-sm text-stone-600 mt-2 max-w-xl">
+                Ruh sağlığı, çocuk gelişimi ve bilişsel farkındalık üzerine bilgilendirici makaleler.
+              </p>
+            </div>
+
+            <a
+              href="#randevu"
+              className="inline-flex items-center gap-2 text-xs font-bold text-[#446A5E] hover:text-[#335047] transition-colors"
+            >
+              Tüm Yazıları İnceleyin <ArrowRight className="w-4 h-4" />
+            </a>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            {blogPosts.map((post) => (
+              <article
+                key={post.id}
+                className="bg-white rounded-3xl p-7 border border-[#E8DFD8] shadow-sm hover:shadow-md hover:border-[#446A5E] transition-all flex flex-col justify-between group"
+              >
+                <div>
+                  <div className="flex items-center justify-between text-xs text-stone-500 mb-4">
+                    <span className="px-3 py-1 rounded-full bg-[#E5ECE9] text-[#446A5E] font-semibold text-[11px]">
+                      {post.category}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Calendar className="w-3.5 h-3.5" />
+                      {post.date}
+                    </span>
+                  </div>
+
+                  <h3 className="font-bold text-lg text-[#192923] group-hover:text-[#446A5E] transition-colors leading-snug mb-3">
+                    {post.title}
+                  </h3>
+
+                  <p className="text-xs sm:text-sm text-stone-600 leading-relaxed line-clamp-3">
+                    {post.excerpt}
+                  </p>
+                </div>
+
+                <div className="pt-6 mt-6 border-t border-[#E8DFD8] flex items-center justify-between text-xs font-semibold text-[#446A5E]">
+                  <span className="text-stone-400 font-normal">{post.readTime}</span>
+                  <span className="flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+                    Devamını Oku <ArrowRight className="w-3.5 h-3.5" />
+                  </span>
+                </div>
+              </article>
+            ))}
+          </div>
+
+        </div>
+      </section>
+
+      {/* 11. Sıkça Sorulan Sorular (SSS) */}
       <section id="sss" className="py-20 bg-white border-y border-[#E8DFD8]">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           
@@ -648,7 +723,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 11. Randevu & İletişim Formu */}
+      {/* 12. Randevu & İletişim Formu */}
       <section id="randevu" className="py-20 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid lg:grid-cols-12 gap-12">
           
@@ -669,7 +744,7 @@ export default function Home() {
                 </div>
                 <div className="text-xs">
                   <span className="font-bold text-[#192923] block text-sm">Yüz Yüze Görüşme Adresi</span>
-                  <span className="text-stone-600">Alsancak Mah. 1476/1 Sk. No:12 Katipoğlu İşmerkezi Daire:4, Konak / İzmir (Oda Psikoloji)</span>
+                  <span className="text-stone-600">Alsancak Mah. 1476/1 Sk. No:12 Katipoğlu İşmerkezi Daire:4, Konak / İzmir</span>
                 </div>
               </div>
 
@@ -719,7 +794,7 @@ export default function Home() {
                 <CheckCircle2 className="w-14 h-14 text-[#446A5E] mx-auto" />
                 <h4 className="text-lg font-bold text-[#192923]">Talebiniz Başarıyla İletildi!</h4>
                 <p className="text-sm text-stone-600 max-w-md mx-auto">
-                  Randevu talebiniz Klinik Psikolog Melike Ermumcu&apos;ya ulaştı[cite: 1]. En kısa sürede sizinle iletişime geçilecektir.
+                  Randevu talebiniz Klinik Psikolog Melike Ermumcu&apos;ya ulaştı. En kısa sürede sizinle iletişime geçilecektir.
                 </p>
                 <button
                   onClick={() => setStatus('idle')}
@@ -830,23 +905,24 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 12. Footer */}
+      {/* 13. Footer */}
       <footer className="bg-[#192923] text-stone-400 py-12 border-t border-[#446A5E]/30 text-xs">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-center md:text-left">
             <div>
-              <span className="text-lg font-bold text-[#FAF7F2] block">Klinik Psikolog Melike Ermumcu[cite: 1]</span>
-              <span className="text-stone-400 text-xs">Oda Psikoloji &bull; Alsancak, İzmir & Online Danışmanlık</span>
+              <span className="text-lg font-bold text-[#FAF7F2] block">Klinik Psikolog Melike Ermumcu</span>
+              <span className="text-stone-400 text-xs">Alsancak, İzmir & Online Danışmanlık</span>
             </div>
             <div className="flex items-center gap-6">
               <a href="#hakkimda" className="hover:text-white transition-colors">Hakkımda</a>
               <a href="#calisma-alanlari" className="hover:text-white transition-colors">Hizmetler</a>
               <a href="#testler" className="hover:text-white transition-colors">Testler</a>
+              <a href="#blog" className="hover:text-white transition-colors">Yazılar</a>
               <a href="#randevu" className="hover:text-white transition-colors">Randevu</a>
             </div>
           </div>
           <div className="border-t border-stone-800 pt-6 text-center text-stone-500 text-[11px]">
-            &copy; 2026 Klinik Psikolog Melike Ermumcu. Tüm hakları saklıdır. Bu sitede yer alan içerikler bilgilendirme amaçlı olup hekim tanısı yerine geçmez[cite: 1].
+            &copy; 2026 Klinik Psikolog Melike Ermumcu. Tüm hakları saklıdır. Bu sitede yer alan içerikler bilgilendirme amaçlı olup hekim tanısı yerine geçmez.
           </div>
         </div>
       </footer>
