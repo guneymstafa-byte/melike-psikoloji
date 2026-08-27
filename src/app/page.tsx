@@ -1,47 +1,96 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
-import {
-  Menu,
+import Link from 'next/link';
+import { 
+  HeartHandshake, 
+  Sparkles, 
+  Puzzle, 
+  Brain, 
+  Calendar, 
+  Clock, 
+  MapPin, 
+  Phone, 
+  Mail, 
+  ArrowRight, 
+  CheckCircle2, 
+  ShieldCheck, 
+  Menu, 
   X,
-  ArrowRight,
-  MapPin,
+  Send,
+  HelpCircle,
   GraduationCap,
-  Check,
-  Phone,
-  Mail,
-  Loader2,
-  CheckCircle2,
-  AlertCircle,
-  ShieldCheck,
-  Brain,
-  Baby,
-  ChevronDown,
   Award,
-  BookOpen,
-  Calendar
+  BookOpen
 } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 export default function Home() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [activeFaq, setActiveFaq] = useState<number | null>(null);
 
+  // Form State
   const [formData, setFormData] = useState({
     name: '',
-    phone: '',
     email: '',
-    type: 'Yüz Yüze Görüşme (Alsancak / İzmir)',
-    datePreference: '',
+    phone: '',
+    service: 'Bireysel Yetişkin Terapisi',
+    date: '',
     note: ''
   });
-  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-  const [errorMessage, setErrorMessage] = useState('');
+  const [formStatus, setFormStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Dinamik Blog Yazıları (Supabase'den çekilir, yoksa varsayılanlar görünür)
+  const [blogPosts, setBlogPosts] = useState<any[]>([
+    {
+      id: '1',
+      slug: 'kaygiyi-anlamak-ve-yonetmek',
+      title: 'Kaygıyı Anlamak ve Yönetmek',
+      excerpt: 'Gündelik yaşamda karşılaştığımız kaygıyı bir tehdit değil, bize sinyal veren bir rehber olarak nasıl dönüştürebiliriz?',
+      category: 'Yetişkin Terapisi',
+      read_time: '4 dk okuma'
+    },
+    {
+      id: '2',
+      slug: 'oyun-terapisi-cocuklarin-dili',
+      title: 'Oyun Terapisi: Çocukların Sessiz Dili',
+      excerpt: 'Çocukların kelimelerle anlatamadıkları iç dünyalarını, travmalarını ve duygusal çatışmalarını oyun yoluyla keşfetme süreci.',
+      category: 'Çocuk & Oyun',
+      read_time: '6 dk okuma'
+    },
+    {
+      id: '3',
+      slug: 'klinik-testler-neden-onemlidir',
+      title: 'Klinik Değerlendirme ve Testlerin Önemi',
+      excerpt: 'Doğru bir psikolojik haritalandırma için uygulanan bilimsel ölçeklerin terapi sürecindeki kritik rolü.',
+      category: 'Klinik Değerlendirme',
+      read_time: '5 dk okuma'
+    }
+  ]);
+
+  useEffect(() => {
+    async function fetchLatestPosts() {
+      try {
+        const { data, error } = await supabase
+          .from('posts')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(3);
+
+        if (data && data.length > 0 && !error) {
+          setBlogPosts(data);
+        }
+      } catch (err) {
+        console.log('Bloglar yüklenirken statik veriler kullanılıyor.');
+      }
+    }
+    fetchLatestPosts();
+  }, []);
+
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setStatus('loading');
-    setErrorMessage('');
+    setFormStatus('loading');
 
     try {
       const res = await fetch('/api/appointment', {
@@ -50,131 +99,126 @@ export default function Home() {
         body: JSON.stringify(formData)
       });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Bir hata oluştu.');
-      }
-
-      setStatus('success');
-      setFormData({
-        name: '',
-        phone: '',
-        email: '',
-        type: 'Yüz Yüze Görüşme (Alsancak / İzmir)',
-        datePreference: '',
-        note: ''
-      });
-    } catch (err: unknown) {
-      setStatus('error');
-      if (err instanceof Error) {
-        setErrorMessage(err.message);
+      if (res.ok) {
+        setFormStatus('success');
+        setFormData({
+          name: '',
+          email: '',
+          phone: '',
+          service: 'Bireysel Yetişkin Terapisi',
+          date: '',
+          note: ''
+        });
       } else {
-        setErrorMessage('Randevu talebi iletilemedi. Lütfen telefon veya WhatsApp ile ulaşınız.');
+        setFormStatus('error');
       }
+    } catch {
+      setFormStatus('error');
     }
   };
 
-  const blogPosts = [
+  const services = [
     {
-      id: 1,
-      title: "Kaygıyı Anlamak ve Yönetmek: Bilişsel Bir Bakış",
-      category: "Yetişkin Terapisi",
-      date: "Ağustos 2026",
-      readTime: "4 dk okuma",
-      excerpt: "Sürekli endişe ve kaygı halinde zihnimizin ürettiği otomatik düşünceleri fark etmek, kaygıyla başa çıkmanın ilk adımıdır."
+      icon: <Brain className="w-8 h-8 text-[#446A5E]" />,
+      title: "Bireysel Yetişkin Terapisi",
+      desc: "Bilişsel Davranışçı Terapi (BDT) ekolüyle kaygı, depresyon, ilişki dinamikleri ve yaşam krizleri üzerine birebir çözüm odaklı çalışma.",
+      tags: ["BDT Ekolü", "Kaygı & Panik", "Duygusal Dayanıklılık"]
     },
     {
-      id: 2,
-      title: "Çocukların Doğal Dili: Oyun Terapisi Neden Önemlidir?",
-      category: "Çocuk & Oyun Terapisi",
-      date: "Ağustos 2026",
-      readTime: "5 dk okuma",
-      excerpt: "Yetişkinler duygularını kelimelerle ifade ederken, çocuklar dünyayı ve içsel çatışmalarını oyunlar ve oyuncaklar aracılığıyla anlatır."
+      icon: <Puzzle className="w-8 h-8 text-[#D6AFA3]" />,
+      title: "Çocuk & Oyun Terapisi",
+      desc: "Çocukların iç dünyalarını oyun diliyle ifade etmelerine olanak tanıyan, gelişimsel ve davranışsal sorunları çözen güvenli alan.",
+      tags: ["Deneyimsel Oyun", "Davranış Problemleri", "Kardeş Kıskançlığı"]
     },
     {
-      id: 3,
-      title: "Psikolojik Testler Bize Ne Söyler, Ne Söylemez?",
-      category: "Klinik Değerlendirme",
-      date: "Temmuz 2026",
-      readTime: "3 dk okuma",
-      excerpt: "MMPI ve gelişim testleri bir etiket değil; bireyi daha derinlemesine tanıyıp doğru bir terapi haritası çizmenin araçlarıdır."
+      icon: <Sparkles className="w-8 h-8 text-[#8C7A6B]" />,
+      title: "Klinik & Gelişim Testleri",
+      desc: "MOXO Dikkat Testi, Denver II Gelişimsel Tarama, WISC-R zeka profili ve objektif projektif değerlendirme ölçekleri.",
+      tags: ["MOXO Dikkat Testi", "Denver II Gelişim", "Projektif Testler"]
+    },
+    {
+      icon: <HeartHandshake className="w-8 h-8 text-[#446A5E]" />,
+      title: "Ebeveyn Danışmanlığı",
+      desc: "Çocukluk ve ergenlik geçişlerinde ebeveyn-çocuk bağını güçlendiren, sınır koyma ve iletişim becerilerini geliştiren rehberlik.",
+      tags: ["Pozitif Ebeveynlik", "İletişim Yönetimi", "Sınır Eğitimi"]
     }
   ];
 
   const faqs = [
     {
-      q: "İlk terapi seansında beni neler bekliyor?",
-      a: "İlk seans kapsamlı bir tanışma ve değerlendirme sürecidir. Yaşadığınız güçlüklerin geçmişi, terapiye başvuru amacınız ve beklentileriniz ele alınarak size özel terapi hedefleri belirlenir."
+      q: "İlk seans süreci nasıl işler?",
+      a: "İlk seans genel bir tanışma ve değerlendirme oturumudur. Yaşadığınız zorlukların haritası çıkarılır, terapi hedefleriniz belirlenir ve size en uygun çalışma planı oluşturulur."
     },
     {
-      q: "Seanslar ne kadar sürüyor ve görüşme sıklığı nedir?",
-      a: "Tüm seanslar 45 dakika sürmektedir. Görüşme sıklığı danışanın ihtiyacına göre genellikle haftada bir veya iki haftada bir olarak planlanır."
+      q: "Oyun terapisi hangi yaş grubu için uygundur?",
+      a: "Oyun terapisi genellikle 2.5 - 12 yaş arasındaki çocuklarda uygulanır. Çocuğun duygularını, korkularını ve iç dünyasını oyun simgeleriyle dışa vurmasını sağlar."
     },
     {
-      q: "Online terapi ile yüz yüze terapi arasında etki farkı var mıdır?",
-      a: "Yapılan bilimsel araştırmalar, etik kurallara ve uygun tekniklere bağlı kalındığında Bilişsel Davranışçı Terapi ekolünün online ortamda da yüz yüze görüşmeler kadar etkili olduğunu göstermektedir."
+      q: "Seans sıklığı ve süreci ne kadardır?",
+      a: "Genel olarak haftada bir seans şeklinde başlanır. Danışanın ihtiyacına ve terapötik ilerlemeye göre 2 haftada bire esnetilebilir."
     },
     {
-      q: "Psikolojik testler nasıl uygulanır ve tanı konur mu?",
-      a: "Uygulanan gelişim, dikkat ve kişilik testleri tek başına tanı koyma aracı değildir. Test bulguları, ayrıntılı klinik görüşme ve gözlem süreci ile sentezlenerek yol haritası çizilir."
+      q: "Görüşmelerde gizlilik nasıl korunur?",
+      a: "Klinik psikoloji etik kuralları çerçevesinde seans odasında paylaşılan tüm bilgiler tam bir gizlilik ve güven altındadır."
     }
   ];
 
   return (
-    <div className="bg-[#FAF7F2] text-[#192923] min-h-screen font-sans selection:bg-[#D6AFA3] selection:text-[#192923]">
+    <div className="min-h-screen bg-[#FAF7F2] text-[#192923] font-sans selection:bg-[#D6AFA3] selection:text-white">
       
-      {/* 1. Üst Bilgi Şeridi */}
-      <div className="bg-[#192923] text-[#FAF7F2] text-xs py-2.5 px-4">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-2">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-[#84A98C] animate-pulse"></span>
-            <span>Alsancak, İzmir &bull; Yüz Yüze & Online Klinik Danışmanlık</span>
+      {/* ÜST BİLGİ ŞERİDİ */}
+      <div className="bg-[#192923] text-[#FAF7F2]/80 text-xs py-2.5 px-4 border-b border-[#FAF7F2]/10">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-2 text-center sm:text-left">
+          <div className="flex items-center gap-6">
+            <span className="flex items-center gap-2">
+              <MapPin className="w-3.5 h-3.5 text-[#D6AFA3]" /> Antalya & Burdur / Çevrim İçi
+            </span>
+            <span className="flex items-center gap-2">
+              <Clock className="w-3.5 h-3.5 text-[#D6AFA3]" /> Pzt - Cmt: 09:00 - 19:00
+            </span>
           </div>
-          <div className="flex items-center gap-4 text-stone-300">
-            <a href="tel:05306560632" className="hover:text-white transition-colors flex items-center gap-1.5">
-              <Phone className="w-3.5 h-3.5 text-[#D6AFA3]" /> 0530 656 06 32
+          <div className="flex items-center gap-4">
+            <a href="mailto:melikeermumcu0@gmail.com" className="hover:text-white transition-colors flex items-center gap-1.5">
+              <Mail className="w-3.5 h-3.5 text-[#D6AFA3]" /> melikeermumcu0@gmail.com
             </a>
-            <span className="opacity-40">|</span>
-            <span>Pzt – Cmt: 09:00 – 19:00</span>
           </div>
         </div>
       </div>
 
-      {/* 2. Header / Navigasyon */}
+      {/* NAVBAR */}
       <header className="sticky top-0 z-50 bg-[#FAF7F2]/90 backdrop-blur-md border-b border-[#E8DFD8]">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-          <a href="#" className="flex flex-col group">
-            <span className="text-2xl font-bold tracking-tight text-[#192923] group-hover:text-[#446A5E] transition-colors">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+          <Link href="/" className="flex flex-col">
+            <span className="text-xl sm:text-2xl font-extrabold tracking-tight text-[#192923]">
               Melike Ermumcu
             </span>
-            <span className="text-[11px] uppercase tracking-[0.25em] text-[#446A5E] font-semibold">
+            <span className="text-[11px] uppercase tracking-widest text-[#446A5E] font-bold">
               Klinik Psikolog
             </span>
-          </a>
+          </Link>
 
-          <nav className="hidden lg:flex items-center space-x-7 text-sm font-medium text-stone-700">
+          {/* Masaüstü Menü */}
+          <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-[#192923]/80">
             <a href="#hakkimda" className="hover:text-[#446A5E] transition-colors">Hakkımda</a>
-            <a href="#calisma-alanlari" className="hover:text-[#446A5E] transition-colors">Çalışma Alanları</a>
-            <a href="#testler" className="hover:text-[#446A5E] transition-colors">Test & Değerlendirme</a>
-            <a href="#surec" className="hover:text-[#446A5E] transition-colors">Terapi Süreci</a>
-            <a href="#egitimler" className="hover:text-[#446A5E] transition-colors">Eğitimler</a>
+            <a href="#uzmanliklar" className="hover:text-[#446A5E] transition-colors">Uzmanlıklar</a>
+            <a href="#testler" className="hover:text-[#446A5E] transition-colors">Klinik Testler</a>
             <a href="#blog" className="hover:text-[#446A5E] transition-colors">Yazılar & Blog</a>
-            <a href="#sss" className="hover:text-[#446A5E] transition-colors">SSS</a>
+            <a href="#sss" className="hover:text-[#446A5E] transition-colors">Sıkça Sorulanlar</a>
           </nav>
 
-          <div className="hidden sm:flex items-center gap-3">
+          <div className="hidden md:flex items-center gap-4">
             <a
               href="#randevu"
-              className="px-6 py-2.5 rounded-full text-sm font-semibold bg-[#446A5E] text-white hover:bg-[#335047] shadow-md hover:shadow-lg transition-all"
+              className="px-5 py-2.5 rounded-full bg-[#446A5E] hover:bg-[#335047] text-white text-xs font-semibold tracking-wide shadow-sm hover:shadow transition-all duration-200"
             >
               Randevu Oluştur
             </a>
           </div>
 
+          {/* Mobil Menü Butonu */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="lg:hidden p-2 text-[#192923]"
+            className="md:hidden p-2 text-[#192923] hover:text-[#446A5E]"
           >
             {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
@@ -182,101 +226,121 @@ export default function Home() {
 
         {/* Mobil Menü */}
         {mobileMenuOpen && (
-          <div className="lg:hidden px-6 pt-3 pb-6 bg-[#FAF7F2] border-b border-[#E8DFD8] space-y-3">
-            <a href="#hakkimda" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-sm font-medium text-stone-800">Hakkımda</a>
-            <a href="#calisma-alanlari" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-sm font-medium text-stone-800">Çalışma Alanları</a>
-            <a href="#testler" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-sm font-medium text-stone-800">Test & Değerlendirme</a>
-            <a href="#surec" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-sm font-medium text-stone-800">Terapi Süreci</a>
-            <a href="#egitimler" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-sm font-medium text-stone-800">Eğitimler</a>
-            <a href="#blog" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-sm font-medium text-stone-800">Yazılar & Blog</a>
-            <a href="#sss" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-sm font-medium text-stone-800">SSS</a>
-            <a href="#randevu" onClick={() => setMobileMenuOpen(false)} className="block text-center py-3 rounded-xl bg-[#446A5E] text-white font-medium">Randevu Oluştur</a>
+          <div className="md:hidden bg-[#FAF7F2] border-b border-[#E8DFD8] px-4 pt-2 pb-6 space-y-3">
+            <a
+              href="#hakkimda"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block py-2 text-sm font-medium text-[#192923]"
+            >
+              Hakkımda
+            </a>
+            <a
+              href="#uzmanliklar"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block py-2 text-sm font-medium text-[#192923]"
+            >
+              Uzmanlıklar
+            </a>
+            <a
+              href="#testler"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block py-2 text-sm font-medium text-[#192923]"
+            >
+              Klinik Testler
+            </a>
+            <a
+              href="#blog"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block py-2 text-sm font-medium text-[#192923]"
+            >
+              Yazılar & Blog
+            </a>
+            <a
+              href="#sss"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block py-2 text-sm font-medium text-[#192923]"
+            >
+              Sıkça Sorulanlar
+            </a>
+            <a
+              href="#randevu"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block w-full text-center py-3 rounded-full bg-[#446A5E] text-white text-xs font-bold"
+            >
+              Randevu Oluştur
+            </a>
           </div>
         )}
       </header>
 
-      {/* 3. Hero Bölümü */}
-      <section className="relative overflow-hidden pt-10 pb-20 md:py-20 border-b border-[#E8DFD8]">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      {/* HERO BÖLÜMÜ */}
+      <section className="relative pt-12 pb-20 sm:pt-20 sm:pb-28 overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-12 gap-12 lg:gap-8 items-center">
             
-            {/* Sol İçerik */}
-            <div className="lg:col-span-7 space-y-6">
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#E5ECE9] border border-[#446A5E]/20 text-[#446A5E] text-xs font-semibold uppercase tracking-wider">
+            <div className="lg:col-span-7 space-y-6 text-center lg:text-left">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#E5ECE9] border border-[#446A5E]/20 text-[#446A5E] text-xs font-semibold">
                 <ShieldCheck className="w-4 h-4" />
-                Bilimsel & Kanıta Dayalı Ekoller
+                <span>Akredite & Bilimsel Terapi Ekolleri</span>
               </div>
-
-              <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-[#192923] leading-[1.18]">
-                Düşüncelerinizi anlamak, <br />
-                <span className="text-[#446A5E] underline decoration-[#D6AFA3] decoration-4 underline-offset-8">
-                  kendinize güvenli bir alan
-                </span> açmakla başlar.
+              
+              <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-[#192923] leading-tight">
+                Düşüncelerinizi anlamak, kendinize <span className="text-[#446A5E] italic">güvenli bir alan</span> açmakla başlar.
               </h1>
 
-              <p className="text-base sm:text-lg text-stone-600 leading-relaxed max-w-xl">
-                Yetişkinlerde <strong>Bilişsel Davranışçı Terapi (BDT)</strong>, çocuk ve ergenlerde <strong>Oyun Terapisi</strong> ve klinik değerlendirme araçlarıyla Alsancak’ta ve online ortamda profesyonel danışmanlık sunuyorum.
+              <p className="text-base sm:text-lg text-stone-600 max-w-2xl mx-auto lg:mx-0 leading-relaxed font-normal">
+                Yetişkinlerde Bilişsel Davranışçı Terapi (BDT), çocuk ve ergenlerde Oyun Terapisi ile klinik değerlendirme araçlarını harmanlayarak danışanlarıma profesyonel bir yol haritası sunuyorum.
               </p>
 
-              <div className="pt-2 flex flex-wrap gap-4 items-center">
+              <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 pt-2">
                 <a
                   href="#randevu"
-                  className="px-7 py-4 rounded-xl bg-[#446A5E] text-white font-semibold hover:bg-[#335047] shadow-lg shadow-[#446A5E]/20 transition-all flex items-center gap-2"
+                  className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-[#446A5E] hover:bg-[#335047] text-white text-sm font-semibold shadow-lg shadow-[#446A5E]/20 hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-2 group"
                 >
-                  Randevu Talebi İletin
-                  <ArrowRight className="w-4 h-4" />
+                  <span>Randevu Tarihi Belirle</span>
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </a>
-                
                 <a
-                  href="https://wa.me/905306560632"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="px-6 py-4 rounded-xl bg-[#F5EAE5] border border-[#D6AFA3] text-[#192923] font-semibold hover:bg-[#EBDCD6] transition-all flex items-center gap-2.5"
+                  href="#hakkimda"
+                  className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-white hover:bg-stone-50 text-[#192923] text-sm font-semibold border border-[#E8DFD8] shadow-sm transition-all text-center"
                 >
-                  <svg className="w-5 h-5 fill-current text-[#446A5E]" viewBox="0 0 24 24">
-                    <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.312.045-.694.076-2.122-.516-1.534-.636-2.529-2.186-2.607-2.29-.076-.104-.627-.834-.627-1.59 0-.756.396-1.127.536-1.28.14-.153.307-.191.41-.191.103 0 .205.001.296.006.096.004.225-.036.352.27.13.312.446 1.085.485 1.164.039.079.065.172.013.276-.052.104-.078.169-.155.26-.078.091-.163.203-.233.273-.078.079-.16.165-.069.321.091.156.405.668.87 1.082.599.534 1.104.699 1.26.778.156.078.247.069.338-.035.091-.104.39-.455.494-.611.104-.156.208-.13.351-.078.144.052.91.43 1.066.508.156.078.26.117.299.182.039.065.039.378-.105.783z"/>
-                  </svg>
-                  WhatsApp ile Danışın
+                  Melike Hanım Kimdir?
                 </a>
               </div>
+
+              {/* Güven Rozetleri */}
+              <div className="grid grid-cols-3 gap-4 pt-8 border-t border-[#E8DFD8]">
+                <div className="text-center lg:text-left">
+                  <p className="text-xl sm:text-2xl font-bold text-[#192923]">Klinik Psikoloji</p>
+                  <p className="text-xs text-stone-500 font-medium">Yüksek Lisans Derecesi</p>
+                </div>
+                <div className="text-center lg:text-left">
+                  <p className="text-xl sm:text-2xl font-bold text-[#192923]">BDT & Oyun</p>
+                  <p className="text-xs text-stone-500 font-medium">Uygulayıcı Sertifikalı</p>
+                </div>
+                <div className="text-center lg:text-left">
+                  <p className="text-xl sm:text-2xl font-bold text-[#192923]">%100</p>
+                  <p className="text-xs text-stone-500 font-medium">Gizlilik & Etik İlke</p>
+                </div>
+              </div>
             </div>
 
-            {/* Sağ Profesyonel Görsel */}
-            <div className="lg:col-span-5 flex justify-center">
-              <div className="relative w-full max-w-sm">
-                
-                {/* Arka Plan Dekoratif Halka */}
-                <div className="absolute -inset-3 bg-gradient-to-br from-[#446A5E]/20 via-[#F5EAE5] to-[#D6AFA3]/30 rounded-3xl transform rotate-2"></div>
-                
-                {/* Ana Fotoğraf Kartı */}
-                <div className="relative rounded-3xl overflow-hidden border-4 border-white shadow-2xl bg-stone-100">
-                  <Image
-                    src="/melike-ermumcu.jpg"
-                    alt="Klinik Psikolog Melike Ermumcu"
-                    width={460}
-                    height={640}
-                    priority
-                    className="w-full h-auto object-cover transform hover:scale-105 transition-transform duration-500"
-                  />
-                  
-                  {/* Fotoğraf Üzeri Alt İsim Etiketi */}
-                  <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-[#192923]/90 via-[#192923]/50 to-transparent p-5 text-white">
-                    <h3 className="text-lg font-bold">Melike Ermumcu</h3>
-                    <p className="text-xs text-[#D6AFA3] font-medium">Uzm. Klinik Psikolog &bull; Alsancak, İzmir</p>
-                  </div>
+            {/* Fotoğraf Alanı */}
+            <div className="lg:col-span-5 relative flex justify-center">
+              <div className="relative w-full max-w-sm sm:max-w-md aspect-[4/5] rounded-3xl overflow-hidden shadow-2xl border-4 border-white bg-stone-200">
+                <Image
+                  src="/melike-ermumcu.jpg"
+                  alt="Klinik Psikolog Melike Ermumcu"
+                  fill
+                  sizes="(max-width: 768px) 100vw, 50vw"
+                  className="object-cover object-top"
+                  priority
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#192923]/60 via-transparent to-transparent"></div>
+                <div className="absolute bottom-4 left-4 right-4 bg-white/95 backdrop-blur-sm p-4 rounded-2xl border border-white/40 shadow-lg">
+                  <p className="text-xs font-bold text-[#192923]">Klinik Psikolog Melike Ermumcu</p>
+                  <p className="text-[11px] text-[#446A5E] font-medium">Yetişkin, Çocuk & Oyun Terapisti</p>
                 </div>
-
-                {/* Floating Badge: Onur Derecesi */}
-                <div className="absolute -bottom-4 -right-4 bg-white/95 backdrop-blur-sm border border-[#E8DFD8] py-2.5 px-4 rounded-2xl shadow-lg flex items-center gap-2.5">
-                  <div className="p-1.5 rounded-lg bg-[#F5EAE5] text-[#446A5E]">
-                    <Award className="w-4 h-4" />
-                  </div>
-                  <div className="text-[11px] leading-tight">
-                    <span className="font-bold text-[#192923] block">Lisans & YL</span>
-                    <span className="text-stone-500">Yüksek Onur Derecesi</span>
-                  </div>
-                </div>
-
               </div>
             </div>
 
@@ -284,645 +348,395 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 4. Dört Temel İlke Şeridi */}
-      <section className="py-12 bg-[#E5ECE9] border-b border-[#446A5E]/20">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="flex items-start gap-3">
-              <div className="p-2.5 rounded-xl bg-[#446A5E] text-white shrink-0">
-                <ShieldCheck className="w-5 h-5" />
+      {/* HAKKIMDA BÖLÜMÜ */}
+      <section id="hakkimda" className="py-20 bg-white border-y border-[#E8DFD8]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid lg:grid-cols-12 gap-12 items-center">
+            
+            <div className="lg:col-span-6 space-y-6">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#F5EAE5] text-[#8C7A6B] text-xs font-bold uppercase tracking-wider">
+                <GraduationCap className="w-4 h-4 text-[#D6AFA3]" />
+                <span>Akademik Geçmiş & Vizyon</span>
               </div>
-              <div>
-                <h4 className="font-bold text-sm text-[#192923]">Koşulsuz Kabul</h4>
-                <p className="text-xs text-stone-600 mt-1">Yargılanmadığınız, tamamen güvenli ve samimi terapi ortamı.</p>
-              </div>
-            </div>
+              
+              <h2 className="text-3xl sm:text-4xl font-extrabold text-[#192923] leading-tight">
+                Her bireyin ve çocuğun kendi iyileşme potansiyeli vardır.
+              </h2>
 
-            <div className="flex items-start gap-3">
-              <div className="p-2.5 rounded-xl bg-[#446A5E] text-white shrink-0">
-                <Brain className="w-5 h-5" />
-              </div>
-              <div>
-                <h4 className="font-bold text-sm text-[#192923]">BDT Ekolü</h4>
-                <p className="text-xs text-stone-600 mt-1">Düşünce, duygu ve davranış döngüsünü hedefleyen kanıta dayalı teknikler.</p>
-              </div>
-            </div>
+              <p className="text-stone-600 text-sm sm:text-base leading-relaxed">
+                Lisans eğitimim boyunca edindiğim kuramsal psikoloji temelini, Klinik Psikoloji Yüksek Lisans programı ile uzmanlık düzeyine taşıdım. Bilişsel Davranışçı Terapi ekolü çerçevesinde bireylerin düşünce kalıplarını yeniden yapılandırmalarına ve duygusal direnç kazanmalarına eşlik ediyorum.
+              </p>
 
-            <div className="flex items-start gap-3">
-              <div className="p-2.5 rounded-xl bg-[#446A5E] text-white shrink-0">
-                <Baby className="w-5 h-5" />
-              </div>
-              <div>
-                <h4 className="font-bold text-sm text-[#192923]">Oyun Terapisi</h4>
-                <p className="text-xs text-stone-600 mt-1">Çocukların duygularını doğal dili olan oyunla ifade etme süreci.</p>
-              </div>
-            </div>
+              <p className="text-stone-600 text-sm sm:text-base leading-relaxed">
+                Çocuklarla yürüttüğüm çalışmalarda ise oyunun dönüştürücü ve onarıcı gücünden faydalanıyorum. Seans odasını; yargısız, kabul edici ve tamamen danışanın ritmine göre şekillenen bir güven alanı olarak tasarlıyorum.
+              </p>
 
-            <div className="flex items-start gap-3">
-              <div className="p-2.5 rounded-xl bg-[#446A5E] text-white shrink-0">
-                <Award className="w-5 h-5" />
-              </div>
-              <div>
-                <h4 className="font-bold text-sm text-[#192923]">Akredite Yetkinlik</h4>
-                <p className="text-xs text-stone-600 mt-1">Türk Psikologlar Derneği ve DATEM onaylı sertifikalı uzmanlık.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 5. Hakkımda & Akademik Geçmiş */}
-      <section id="hakkimda" className="py-20 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid lg:grid-cols-12 gap-12 items-start">
-          
-          <div className="lg:col-span-5 space-y-4">
-            <span className="text-xs font-bold uppercase tracking-widest text-[#446A5E]">Özgeçmiş & Yaklaşım</span>
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-[#192923]">
-              Her bireyin deneyimi kendine özgüdür.
-            </h2>
-            <div className="p-6 rounded-2xl bg-[#F5EAE5] border border-[#D6AFA3] text-stone-800 text-sm leading-relaxed italic">
-              &quot;Terapi sürecinde kişinin yaşadığı güçlükleri anlamasına, düşünce ve duygu süreçlerini fark etmesine ve günlük yaşamda daha işlevsel baş etme becerileri geliştirmesine destek oluyorum.&quot;
-            </div>
-          </div>
-
-          <div className="lg:col-span-7 space-y-5">
-            <p className="text-stone-700 text-sm sm:text-base leading-relaxed">
-              Uluslararası Kıbrıs Üniversitesi Psikoloji lisans programını 3.65 onur derecesiyle tamamladıktan sonra, aynı üniversitede Klinik Psikoloji Yüksek Lisans eğitimimi başarıyla tamamladım.
-            </p>
-            <p className="text-stone-700 text-sm sm:text-base leading-relaxed">
-              Klinik çalışmalarımda yetişkin danışanlarla <strong>Bilişsel Davranışçı Terapi (BDT)</strong> çerçevesinde çalışırken; çocuk ve ergen danışanlarımla gelişim düzeylerine uygun olarak <strong>Çocuk Merkezli Oyun Terapisi</strong> ve projektif/bilişsel test bataryaları doğrultusunda ilerlemekteyim.
-            </p>
-
-            <div className="grid sm:grid-cols-2 gap-4 pt-4">
-              <div className="p-5 rounded-2xl bg-white border border-[#E8DFD8] shadow-sm">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="p-2 rounded-lg bg-[#E5ECE9] text-[#446A5E]">
-                    <GraduationCap className="w-5 h-5" />
-                  </div>
+              <div className="grid sm:grid-cols-2 gap-4 pt-2">
+                <div className="p-4 rounded-2xl bg-[#FAF7F2] border border-[#E8DFD8] flex items-start gap-3">
+                  <Award className="w-5 h-5 text-[#446A5E] shrink-0 mt-0.5" />
                   <div>
-                    <span className="text-xs font-bold text-[#446A5E]">2023 - 2025</span>
-                    <h4 className="font-bold text-sm text-[#192923]">Klinik Psikoloji (YL)</h4>
+                    <h4 className="text-xs font-bold text-[#192923]">BDT Uygulayıcısı</h4>
+                    <p className="text-[11px] text-stone-500 mt-0.5">Bilişsel Davranışçı Psikoterapiler Derneği Akreditasyonu</p>
                   </div>
                 </div>
-                <p className="text-xs text-stone-500">Uluslararası Kıbrıs Üniversitesi &bull; GPA: 3.53 / 4.00</p>
-              </div>
 
-              <div className="p-5 rounded-2xl bg-white border border-[#E8DFD8] shadow-sm">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="p-2 rounded-lg bg-[#E5ECE9] text-[#446A5E]">
-                    <GraduationCap className="w-5 h-5" />
-                  </div>
+                <div className="p-4 rounded-2xl bg-[#FAF7F2] border border-[#E8DFD8] flex items-start gap-3">
+                  <BookOpen className="w-5 h-5 text-[#D6AFA3] shrink-0 mt-0.5" />
                   <div>
-                    <span className="text-xs font-bold text-[#446A5E]">2018 - 2022</span>
-                    <h4 className="font-bold text-sm text-[#192923]">Psikoloji (Lisans)</h4>
+                    <h4 className="text-xs font-bold text-[#192923]">Oyun Terapisi Uzmanlığı</h4>
+                    <p className="text-[11px] text-stone-500 mt-0.5">Çocuk Merkezli ve Deneyimsel Oyun Ekolü</p>
                   </div>
                 </div>
-                <p className="text-xs text-stone-500">Uluslararası Kıbrıs Üniversitesi &bull; GPA: 3.65 / 4.00</p>
               </div>
             </div>
-          </div>
 
+            <div className="lg:col-span-6 bg-[#FAF7F2] p-8 sm:p-10 rounded-3xl border border-[#E8DFD8] space-y-6">
+              <h3 className="text-xl font-bold text-[#192923]">Çalışma İlkelerim</h3>
+              
+              <div className="space-y-4">
+                <div className="flex gap-4">
+                  <div className="w-8 h-8 rounded-xl bg-[#E5ECE9] text-[#446A5E] flex items-center justify-center shrink-0 font-bold text-xs">01</div>
+                  <div>
+                    <h5 className="text-sm font-bold text-[#192923]">Bireye Özgü Yaklaşım</h5>
+                    <p className="text-xs text-stone-600 mt-1">Her danışanın yaşam serüveni biriciktir; terapi haritası kişisel ihtiyaçlara göre özelleştirilir.</p>
+                  </div>
+                </div>
+
+                <div className="flex gap-4">
+                  <div className="w-8 h-8 rounded-xl bg-[#E5ECE9] text-[#446A5E] flex items-center justify-center shrink-0 font-bold text-xs">02</div>
+                  <div>
+                    <h5 className="text-sm font-bold text-[#192923]">Bilimsel ve Kanıta Dayalı Ekoller</h5>
+                    <p className="text-xs text-stone-600 mt-1">Uluslararası geçerliliği kanıtlanmış psikoterapi ekolleri ve geçerli test bataryaları kullanılır.</p>
+                  </div>
+                </div>
+
+                <div className="flex gap-4">
+                  <div className="w-8 h-8 rounded-xl bg-[#E5ECE9] text-[#446A5E] flex items-center justify-center shrink-0 font-bold text-xs">03</div>
+                  <div>
+                    <h5 className="text-sm font-bold text-[#192923]">Mutlak Gizlilik ve Etik Standartlar</h5>
+                    <p className="text-xs text-stone-600 mt-1">Türk Psikologlar Derneği etik yönetmeliği ilkelerine titizlikle bağlı kalınır.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
         </div>
       </section>
 
-      {/* 6. Çalışma Alanları */}
-      <section id="calisma-alanlari" className="py-20 bg-white border-y border-[#E8DFD8]">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          
-          <div className="text-center max-w-2xl mx-auto mb-16">
-            <span className="text-xs font-bold uppercase tracking-widest text-[#446A5E]">Hizmet Detayları</span>
-            <h2 className="text-3xl font-extrabold text-[#192923] mt-1">Uzmanlık ve Çalışma Alanlarım</h2>
-            <p className="text-sm text-stone-600 mt-2">
-              Bireysel ihtiyaçlara göre yapılandırılmış yüz yüze ve online terapi programları.
-            </p>
+      {/* UZMANLIK ALANLARI */}
+      <section id="uzmanliklar" className="py-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center max-w-2xl mx-auto space-y-3 mb-16">
+            <span className="text-xs font-bold text-[#446A5E] uppercase tracking-widest">Hizmet Alanları</span>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-[#192923]">Klinik Hizmetler & Terapi Alanları</h2>
+            <p className="text-sm text-stone-600">Her yaş grubuna ve ihtiyaca yönelik yapılandırılmış profesyonel seans süreçleri.</p>
           </div>
 
           <div className="grid md:grid-cols-2 gap-8">
-            
-            {/* Yetişkin */}
-            <div className="rounded-3xl bg-[#FAF7F2] p-8 border border-[#E8DFD8] flex flex-col justify-between hover:border-[#446A5E] transition-all group">
-              <div>
-                <div className="w-14 h-14 rounded-2xl bg-[#E5ECE9] text-[#446A5E] flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                  <Brain className="w-7 h-7" />
+            {services.map((svc, idx) => (
+              <div
+                key={idx}
+                className="bg-white p-8 rounded-3xl border border-[#E8DFD8] shadow-sm hover:shadow-md transition-all space-y-5 flex flex-col justify-between"
+              >
+                <div className="space-y-4">
+                  <div className="w-14 h-14 rounded-2xl bg-[#FAF7F2] border border-[#E8DFD8] flex items-center justify-center">
+                    {svc.icon}
+                  </div>
+                  <h3 className="text-xl font-bold text-[#192923]">{svc.title}</h3>
+                  <p className="text-sm text-stone-600 leading-relaxed">{svc.desc}</p>
                 </div>
-                <h3 className="text-xl font-bold text-[#192923] mb-3">Yetişkin Bireysel Terapi</h3>
-                <p className="text-stone-600 text-sm leading-relaxed mb-6">
-                  Yetişkinlerle Bilişsel Davranışçı Terapi (BDT) ilkeleri ışığında çalışılmaktadır. Kişinin düşünce-duygu kalıplarını keşfetmesi ve yaşamında karşılaştığı zorluklarla baş etme becerilerini güçlendirmesi hedeflenir.
-                </p>
-                <div className="flex flex-wrap gap-2 mb-6">
-                  {['Panik Bozukluk', 'Sosyal Kaygı', 'OKB', 'TSSB', 'Depresyon', 'Uyum Güçlükleri'].map((item, idx) => (
-                    <span key={idx} className="px-3 py-1 bg-white rounded-lg text-xs font-medium text-stone-700 border border-[#E8DFD8]">
-                      {item}
+                <div className="flex flex-wrap gap-2 pt-4 border-t border-[#E8DFD8]/60">
+                  {svc.tags.map((tag, tIdx) => (
+                    <span
+                      key={tIdx}
+                      className="text-[11px] font-semibold px-3 py-1 rounded-full bg-[#FAF7F2] text-stone-600 border border-[#E8DFD8]"
+                    >
+                      {tag}
                     </span>
                   ))}
                 </div>
               </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
-              <div className="pt-4 border-t border-[#E8DFD8] text-xs font-semibold text-[#446A5E] flex items-center gap-1.5">
-                <Check className="w-4 h-4" /> BDT Temelli Kanıta Dayalı Müdahale Teknikleri
-              </div>
-            </div>
+      {/* KLİNİK TESTLER */}
+      <section id="testler" className="py-20 bg-[#FAF7F2] border-t border-[#E8DFD8]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-[#192923] text-white rounded-3xl p-8 sm:p-14 overflow-hidden relative shadow-2xl">
+            <div className="relative z-10 max-w-3xl space-y-6">
+              <span className="text-xs font-bold text-[#D6AFA3] uppercase tracking-widest">Objektif Ölçümleme</span>
+              <h2 className="text-3xl sm:text-4xl font-extrabold leading-tight">
+                Uygulanan Klinik Değerlendirme & Gelişim Testleri
+              </h2>
+              <p className="text-sm sm:text-base text-[#FAF7F2]/80 leading-relaxed">
+                Tanı ve terapi sürecini desteklemek amacıyla dünya standartlarında kabul görmüş ölçekler ve projektif testler uygulanmaktadır.
+              </p>
 
-            {/* Çocuk & Ergen */}
-            <div className="rounded-3xl bg-[#FAF7F2] p-8 border border-[#E8DFD8] flex flex-col justify-between hover:border-[#D6AFA3] transition-all group">
-              <div>
-                <div className="w-14 h-14 rounded-2xl bg-[#F5EAE5] text-[#192923] flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                  <Baby className="w-7 h-7" />
+              <div className="grid sm:grid-cols-2 gap-4 pt-4">
+                <div className="bg-white/10 backdrop-blur-sm p-4 rounded-2xl border border-white/10 space-y-1">
+                  <h4 className="text-sm font-bold text-white">MOXO Dikkat Testi</h4>
+                  <p className="text-xs text-[#FAF7F2]/70">Dikkat eksikliği, hiperaktivite ve zamanlama profilini bilgisayarlı görsel/işitsel çeldiricilerle ölçer.</p>
                 </div>
-                <h3 className="text-xl font-bold text-[#192923] mb-3">Çocuk & Ergen Terapisi</h3>
-                <p className="text-stone-600 text-sm leading-relaxed mb-6">
-                  Çocukların gelişimsel düzeyine uygun olarak <strong>Çocuk Merkezli Oyun Terapisi</strong> ile duygusal, davranışsal ve sosyal güçlükler ele alınır; ebeveyn danışmanlığı ile süreç desteklenir.
-                </p>
-                <div className="flex flex-wrap gap-2 mb-6">
-                  {['Kaygı & Korkular', 'Öfke Kontrolü', 'DEHB & Odaklanma', 'Okul Olgunluğu', 'Özgüven Gelişimi', 'Sosyal Güçlükler'].map((item, idx) => (
-                    <span key={idx} className="px-3 py-1 bg-white rounded-lg text-xs font-medium text-stone-700 border border-[#E8DFD8]">
-                      {item}
-                    </span>
-                  ))}
+                <div className="bg-white/10 backdrop-blur-sm p-4 rounded-2xl border border-white/10 space-y-1">
+                  <h4 className="text-sm font-bold text-white">Denver II Gelişimsel Tarama</h4>
+                  <p className="text-xs text-[#FAF7F2]/70">0-6 yaş arası çocukların motor, dil ve sosyal beceri gelişimlerini ayrıntılı olarak raporlar.</p>
+                </div>
+                <div className="bg-white/10 backdrop-blur-sm p-4 rounded-2xl border border-white/10 space-y-1">
+                  <h4 className="text-sm font-bold text-white">Projektif Çizim & Çocuk Testleri</h4>
+                  <p className="text-xs text-[#FAF7F2]/70">Bir İnsan Çiz, Louisa Düss Psikanalitik Hikayeler ve Beier Cümle Tamamlama testleri.</p>
+                </div>
+                <div className="bg-white/10 backdrop-blur-sm p-4 rounded-2xl border border-white/10 space-y-1">
+                  <h4 className="text-sm font-bold text-white">Objektif Kişilik & Duygu Ölçekleri</h4>
+                  <p className="text-xs text-[#FAF7F2]/70">Beck Depresyon ve Anksiyete Ölçekleri ile duygu durum haritalandırması.</p>
                 </div>
               </div>
-
-              <div className="pt-4 border-t border-[#E8DFD8] text-xs font-semibold text-[#446A5E] flex items-center gap-1.5">
-                <Check className="w-4 h-4" /> TPD Sertifikalı Çocuk Merkezli Oyun Terapisi
-              </div>
             </div>
-
           </div>
         </div>
       </section>
 
-      {/* 7. Psikolojik Testler ve Bataryalar */}
-      <section id="testler" className="py-20 bg-[#F5EAE5] border-b border-[#D6AFA3]/40">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          
-          <div className="text-center max-w-2xl mx-auto mb-14">
-            <span className="text-xs font-bold uppercase tracking-widest text-[#446A5E]">Kapsamlı Değerlendirme</span>
-            <h2 className="text-3xl font-extrabold text-[#192923] mt-1">Psikolojik Testler & Klinik Envanterler</h2>
-            <div className="mt-3 inline-block px-4 py-1.5 bg-white/80 rounded-full border border-[#D6AFA3] text-xs text-stone-700 font-medium">
-              * Testler tanı koymak için tek başına kullanılmaz; klinik görüşme bulgularıyla birleştirilir.
+      {/* BLOG BÖLÜMÜ (CANLI SUPABASE BAĞLANTILI) */}
+      <section id="blog" className="py-20 bg-white border-y border-[#E8DFD8]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 mb-12">
+            <div className="space-y-2">
+              <span className="text-xs font-bold text-[#446A5E] uppercase tracking-widest">Psikoloji Kütüphanesi</span>
+              <h2 className="text-3xl font-extrabold text-[#192923]">Yazılar & Makaleler</h2>
+              <p className="text-xs sm:text-sm text-stone-500">Ruh sağlığı, çocuk gelişimi ve terapötik farkındalık üzerine yazılar.</p>
             </div>
-          </div>
-
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            
-            <div className="p-6 rounded-2xl bg-white border border-[#D6AFA3]/60 shadow-sm">
-              <span className="px-2.5 py-1 rounded bg-[#E5ECE9] text-[#446A5E] text-[11px] font-bold">Gelişim</span>
-              <h4 className="font-bold text-base text-[#192923] mt-2">AGTE</h4>
-              <p className="text-xs text-[#446A5E] font-medium">Ankara Gelişim Tarama Envanteri</p>
-              <p className="text-xs text-stone-600 mt-2 leading-relaxed">
-                0-6 yaş arası çocukların dil-bilişsel, ince-kaba motor ve sosyal gelişim basamaklarının tespiti.
-              </p>
-            </div>
-
-            <div className="p-6 rounded-2xl bg-white border border-[#D6AFA3]/60 shadow-sm">
-              <span className="px-2.5 py-1 rounded bg-[#E5ECE9] text-[#446A5E] text-[11px] font-bold">Dikkat</span>
-              <h4 className="font-bold text-base text-[#192923] mt-2">d2 Dikkat Testi</h4>
-              <p className="text-xs text-[#446A5E] font-medium">Seçici Dikkat & Odaklanma</p>
-              <p className="text-xs text-stone-600 mt-2 leading-relaxed">
-                Psikomotor hız, odaklanma süresi ve dikkat dağınıklığının objektif ölçümü.
-              </p>
-            </div>
-
-            <div className="p-6 rounded-2xl bg-white border border-[#D6AFA3]/60 shadow-sm">
-              <span className="px-2.5 py-1 rounded bg-[#E5ECE9] text-[#446A5E] text-[11px] font-bold">Okul Çağı</span>
-              <h4 className="font-bold text-base text-[#192923] mt-2">Metropolitan</h4>
-              <p className="text-xs text-[#446A5E] font-medium">Okul Olgunluğu Testi</p>
-              <p className="text-xs text-stone-600 mt-2 leading-relaxed">
-                Çocuğun 1. sınıfa başlama zihinsel, işitsel ve motor hazırlığının kapsamlı değerlendirmesi.
-              </p>
-            </div>
-
-            <div className="p-6 rounded-2xl bg-white border border-[#D6AFA3]/60 shadow-sm">
-              <span className="px-2.5 py-1 rounded bg-[#E5ECE9] text-[#446A5E] text-[11px] font-bold">Projektif</span>
-              <h4 className="font-bold text-base text-[#192923] mt-2">Projektif Çizim Testleri</h4>
-              <p className="text-xs text-[#446A5E] font-medium">Duygusal İfade Araçları</p>
-              <p className="text-xs text-stone-600 mt-2 leading-relaxed">
-                Çocuğun aile algısı, içsel çatışmaları ve duygusal dünyasını anlamaya yönelik çizim analizleri.
-              </p>
-            </div>
-
-            <div className="p-6 rounded-2xl bg-white border border-[#D6AFA3]/60 shadow-sm">
-              <span className="px-2.5 py-1 rounded bg-[#E5ECE9] text-[#446A5E] text-[11px] font-bold">Yetişkin</span>
-              <h4 className="font-bold text-base text-[#192923] mt-2">MMPI</h4>
-              <p className="text-xs text-[#446A5E] font-medium">Çokyönlü Kişilik Envanteri</p>
-              <p className="text-xs text-stone-600 mt-2 leading-relaxed">
-                Yetişkinlerde kişilik örüntüleri, savunma mekanizmaları ve klinik semptomların standart analizi.
-              </p>
-            </div>
-
-            <div className="p-6 rounded-2xl bg-white border border-[#E8DFD8] shadow-sm">
-              <span className="px-2.5 py-1 rounded bg-[#E5ECE9] text-[#446A5E] text-[11px] font-bold">Ölçekler</span>
-              <h4 className="font-bold text-base text-[#192923] mt-2">Duygu Durum Ölçekleri</h4>
-              <p className="text-xs text-[#446A5E] font-medium">Semptom & Belirti Taraması</p>
-              <p className="text-xs text-stone-600 mt-2 leading-relaxed">
-                Kaygı, depresyon, öfke ve davranış ölçekleriyle klinik tablonun şiddetini belirleme.
-              </p>
-            </div>
-
-          </div>
-        </div>
-      </section>
-
-      {/* 8. Terapi Süreci */}
-      <section id="surec" className="py-20 bg-[#192923] text-white">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          
-          <div className="text-center max-w-2xl mx-auto mb-16">
-            <span className="text-xs font-bold uppercase tracking-widest text-[#D6AFA3]">Adım Adım İlerleme</span>
-            <h2 className="text-3xl font-extrabold text-[#FAF7F2] mt-1">Danışmanlık Süreci Nasıl İşler?</h2>
-            <p className="text-sm text-stone-300 mt-2">
-              Şeffaf, etik ilkelere bağlı ve danışan odaklı üç aşamalı terapi protokolü.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8 relative">
-            
-            <div className="p-8 rounded-3xl bg-[#233830] border border-[#446A5E]/40 relative">
-              <div className="text-3xl font-extrabold text-[#D6AFA3] mb-4">01</div>
-              <h3 className="text-lg font-bold text-white mb-2">Randevu & Ön Değerlendirme</h3>
-              <p className="text-xs text-stone-300 leading-relaxed">
-                Web sitesi veya WhatsApp üzerinden talebinizi iletirsiniz. Yüz yüze veya online görüşme tercihine göre en uygun gün ve saat belirlenir.
-              </p>
-            </div>
-
-            <div className="p-8 rounded-3xl bg-[#233830] border border-[#446A5E]/40 relative">
-              <div className="text-3xl font-extrabold text-[#D6AFA3] mb-4">02</div>
-              <h3 className="text-lg font-bold text-white mb-2">İlk Görüşme & Vaka Analizi</h3>
-              <p className="text-xs text-stone-300 leading-relaxed">
-                45 dakikalık ilk seansta mevcut güçlükler, gelişim öyküsü ve beklentiler detaylıca dinlenir; gerekli psikolojik ölçekler planlanır.
-              </p>
-            </div>
-
-            <div className="p-8 rounded-3xl bg-[#233830] border border-[#446A5E]/40 relative">
-              <div className="text-3xl font-extrabold text-[#D6AFA3] mb-4">03</div>
-              <h3 className="text-lg font-bold text-white mb-2">Terapi Planı & Kazanımlar</h3>
-              <p className="text-xs text-stone-300 leading-relaxed">
-                Bilişsel Davranışçı Terapi veya Oyun Terapisi hedefleri belirlenir. Düzenli seanslarla işlevsel baş etme mekanizmaları geliştirilir.
-              </p>
-            </div>
-
-          </div>
-        </div>
-      </section>
-
-      {/* 9. Sertifikalar & Akreditasyonlar */}
-      <section id="egitimler" className="py-20 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="max-w-2xl mb-12">
-          <span className="text-xs font-bold uppercase tracking-widest text-[#446A5E]">Mesleki Yetkinlik</span>
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-[#192923] mt-1">Alınan Eğitimler & Sertifikalar</h2>
-        </div>
-
-        <div className="grid md:grid-cols-2 gap-4">
-          
-          <div className="p-5 rounded-2xl bg-white border border-[#E8DFD8] shadow-sm flex items-start justify-between gap-4">
-            <div>
-              <h4 className="font-bold text-sm text-[#192923]">Bilişsel ve Davranışsal Terapiler Eğitimi (BDT)</h4>
-              <p className="text-xs text-stone-500 mt-1">DATEM, BİKTEP &bull; Prof. Dr. Ebru Şalcıoğlu</p>
-              <p className="text-[11px] text-stone-400 mt-0.5">Sertifika No: BDT2301-A03005</p>
-            </div>
-            <span className="px-3 py-1 bg-[#E5ECE9] text-[#446A5E] font-bold text-xs rounded-full shrink-0">2023</span>
-          </div>
-
-          <div className="p-5 rounded-2xl bg-white border border-[#E8DFD8] shadow-sm flex items-start justify-between gap-4">
-            <div>
-              <h4 className="font-bold text-sm text-[#192923]">Çocuk Merkezli Oyun Terapisi</h4>
-              <p className="text-xs text-stone-500 mt-1">Türk Psikologlar Derneği &bull; Doç. Dr. Cihat Çelik</p>
-              <p className="text-[11px] text-stone-400 mt-0.5">Belge No: 2026/3014</p>
-            </div>
-            <span className="px-3 py-1 bg-[#E5ECE9] text-[#446A5E] font-bold text-xs rounded-full shrink-0">2026</span>
-          </div>
-
-          <div className="p-5 rounded-2xl bg-white border border-[#E8DFD8] shadow-sm flex items-start justify-between gap-4">
-            <div>
-              <h4 className="font-bold text-sm text-[#192923]">Çocuk Değerlendirme Paketi Eğitimi</h4>
-              <p className="text-xs text-stone-500 mt-1">Türk Psikologlar Derneği &bull; Doç. Dr. Cihat Çelik</p>
-              <p className="text-[11px] text-stone-400 mt-0.5">Belge No: 2026/3425</p>
-            </div>
-            <span className="px-3 py-1 bg-[#E5ECE9] text-[#446A5E] font-bold text-xs rounded-full shrink-0">2026</span>
-          </div>
-
-          <div className="p-5 rounded-2xl bg-white border border-[#E8DFD8] shadow-sm flex items-start justify-between gap-4">
-            <div>
-              <h4 className="font-bold text-sm text-[#192923]">MMPI Uygulama ve Yorumlama Eğitimi</h4>
-              <p className="text-xs text-stone-500 mt-1">Türk Psikologlar Derneği &bull; Doç. Dr. Merve Muazzez Avcıoğlu</p>
-              <p className="text-[11px] text-stone-400 mt-0.5">Belge No: 1919 / 2025</p>
-            </div>
-            <span className="px-3 py-1 bg-[#E5ECE9] text-[#446A5E] font-bold text-xs rounded-full shrink-0">2025</span>
-          </div>
-
-          <div className="p-5 rounded-2xl bg-white border border-[#E8DFD8] shadow-sm flex items-start justify-between gap-4">
-            <div>
-              <h4 className="font-bold text-sm text-[#192923]">Portage Erken Çocukluk Eğitimi</h4>
-              <p className="text-xs text-stone-500 mt-1">Dr. Ender Uzundemir Marangoz (Özel Eğitim Uzmanı)</p>
-            </div>
-            <span className="px-3 py-1 bg-[#E5ECE9] text-[#446A5E] font-bold text-xs rounded-full shrink-0">2024</span>
-          </div>
-
-          <div className="p-5 rounded-2xl bg-white border border-[#E8DFD8] shadow-sm flex items-start justify-between gap-4">
-            <div>
-              <h4 className="font-bold text-sm text-[#192923]">Çocuk İstismarı ve İhmali Eğitimi</h4>
-              <p className="text-xs text-stone-500 mt-1">Paradoks Psikoloji</p>
-            </div>
-            <span className="px-3 py-1 bg-[#E5ECE9] text-[#446A5E] font-bold text-xs rounded-full shrink-0">2022</span>
-          </div>
-
-        </div>
-      </section>
-
-      {/* 10. Yazılar & Blog Bölümü */}
-      <section id="blog" className="py-20 bg-[#FAF7F2] border-t border-[#E8DFD8]">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          
-          <div className="flex flex-col md:flex-row md:items-end justify-between mb-14 gap-4">
-            <div>
-              <span className="text-xs font-bold uppercase tracking-widest text-[#446A5E]">Psikoloji & Farkındalık</span>
-              <h2 className="text-3xl font-extrabold text-[#192923] mt-1">Yazılar & Makaleler</h2>
-              <p className="text-sm text-stone-600 mt-2 max-w-xl">
-                Ruh sağlığı, çocuk gelişimi ve bilişsel farkındalık üzerine bilgilendirici makaleler.
-              </p>
-            </div>
-
-            <a
-              href="#randevu"
-              className="inline-flex items-center gap-2 text-xs font-bold text-[#446A5E] hover:text-[#335047] transition-colors"
+            <Link
+              href="/admin"
+              className="text-xs text-[#446A5E] hover:text-[#335047] font-bold underline cursor-pointer"
             >
-              Tüm Yazıları İnceleyin <ArrowRight className="w-4 h-4" />
-            </a>
+              Yönetici Paneli (Yazı Ekle) →
+            </Link>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
             {blogPosts.map((post) => (
-              <article
+              <Link
                 key={post.id}
-                className="bg-white rounded-3xl p-7 border border-[#E8DFD8] shadow-sm hover:shadow-md hover:border-[#446A5E] transition-all flex flex-col justify-between group"
+                href={`/blog/${post.slug || post.id}`}
+                className="bg-[#FAF7F2] rounded-3xl p-6 border border-[#E8DFD8] hover:shadow-lg transition-all flex flex-col justify-between group"
               >
-                <div>
-                  <div className="flex items-center justify-between text-xs text-stone-500 mb-4">
-                    <span className="px-3 py-1 rounded-full bg-[#E5ECE9] text-[#446A5E] font-semibold text-[11px]">
-                      {post.category}
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center text-xs text-stone-500">
+                    <span className="font-bold text-[#446A5E] bg-[#E5ECE9] px-2.5 py-1 rounded-full text-[10px]">
+                      {post.category || 'Psikoloji'}
                     </span>
                     <span className="flex items-center gap-1">
-                      <Calendar className="w-3.5 h-3.5" />
-                      {post.date}
+                      <Clock className="w-3 h-3" /> {post.read_time || '4 dk okuma'}
                     </span>
                   </div>
-
-                  <h3 className="font-bold text-lg text-[#192923] group-hover:text-[#446A5E] transition-colors leading-snug mb-3">
+                  <h3 className="text-lg font-bold text-[#192923] group-hover:text-[#446A5E] transition-colors leading-snug">
                     {post.title}
                   </h3>
-
-                  <p className="text-xs sm:text-sm text-stone-600 leading-relaxed line-clamp-3">
+                  <p className="text-xs text-stone-600 line-clamp-3 leading-relaxed">
                     {post.excerpt}
                   </p>
                 </div>
-
-                <div className="pt-6 mt-6 border-t border-[#E8DFD8] flex items-center justify-between text-xs font-semibold text-[#446A5E]">
-                  <span className="text-stone-400 font-normal">{post.readTime}</span>
-                  <span className="flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-                    Devamını Oku <ArrowRight className="w-3.5 h-3.5" />
-                  </span>
+                <div className="pt-4 mt-4 border-t border-[#E8DFD8] flex items-center justify-between text-xs font-bold text-[#446A5E]">
+                  <span>Makaleyi Oku</span>
+                  <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
                 </div>
-              </article>
+              </Link>
             ))}
           </div>
-
         </div>
       </section>
 
-      {/* 11. Sıkça Sorulan Sorular (SSS) */}
-      <section id="sss" className="py-20 bg-white border-y border-[#E8DFD8]">
+      {/* SSS BÖLÜMÜ */}
+      <section id="sss" className="py-20">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          
-          <div className="text-center mb-12">
-            <span className="text-xs font-bold uppercase tracking-widest text-[#446A5E]">Merak Edilenler</span>
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-[#192923] mt-1">Sıkça Sorulan Sorular</h2>
+          <div className="text-center space-y-3 mb-12">
+            <span className="text-xs font-bold text-[#446A5E] uppercase tracking-widest">Merak Edilenler</span>
+            <h2 className="text-3xl font-extrabold text-[#192923]">Sıkça Sorulan Sorular</h2>
           </div>
 
           <div className="space-y-4">
-            {faqs.map((faq, index) => (
+            {faqs.map((faq, idx) => (
               <div
-                key={index}
-                className="rounded-2xl border border-[#E8DFD8] bg-[#FAF7F2] overflow-hidden transition-all"
+                key={idx}
+                className="bg-white rounded-2xl border border-[#E8DFD8] overflow-hidden transition-all"
               >
                 <button
-                  onClick={() => setOpenFaq(openFaq === index ? null : index)}
-                  className="w-full p-5 text-left flex items-center justify-between gap-4 font-semibold text-sm sm:text-base text-[#192923]"
+                  onClick={() => setActiveFaq(activeFaq === idx ? null : idx)}
+                  className="w-full p-5 text-left flex justify-between items-center gap-4 cursor-pointer"
                 >
-                  <span>{faq.q}</span>
-                  <ChevronDown className={`w-5 h-5 text-[#446A5E] transition-transform shrink-0 ${openFaq === index ? 'rotate-180' : ''}`} />
+                  <span className="text-sm font-bold text-[#192923] flex items-center gap-3">
+                    <HelpCircle className="w-4 h-4 text-[#446A5E] shrink-0" />
+                    {faq.q}
+                  </span>
+                  <span className="text-xl font-bold text-stone-400">
+                    {activeFaq === idx ? '−' : '+'}
+                  </span>
                 </button>
-                {openFaq === index && (
-                  <div className="px-5 pb-5 text-xs sm:text-sm text-stone-600 leading-relaxed border-t border-[#E8DFD8] pt-3">
+                {activeFaq === idx && (
+                  <div className="px-5 pb-5 text-xs sm:text-sm text-stone-600 leading-relaxed border-t border-[#FAF7F2] pt-3">
                     {faq.a}
                   </div>
                 )}
               </div>
             ))}
           </div>
-
         </div>
       </section>
 
-      {/* 12. Randevu & İletişim Formu */}
-      <section id="randevu" className="py-20 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid lg:grid-cols-12 gap-12">
-          
-          {/* Sol İletişim Kartı */}
-          <div id="iletisim" className="lg:col-span-5 space-y-6">
-            <div>
-              <span className="text-xs font-bold uppercase tracking-widest text-[#446A5E]">İletişim & Konum</span>
-              <h2 className="text-3xl font-extrabold text-[#192923] mt-1">Randevu Oluşturun</h2>
-              <p className="text-sm text-stone-600 mt-2">
-                Terapi süreciyle ilgili sorularınız veya seans planlaması için formu doldurabilir ya da doğrudan arayabilirsiniz.
-              </p>
-            </div>
-
-            <div className="space-y-4 pt-2">
-              <div className="flex items-start gap-3.5 p-4 rounded-2xl bg-white border border-[#E8DFD8]">
-                <div className="p-2.5 rounded-xl bg-[#E5ECE9] text-[#446A5E] shrink-0 mt-0.5">
-                  <MapPin className="w-5 h-5" />
-                </div>
-                <div className="text-xs">
-                  <span className="font-bold text-[#192923] block text-sm">Yüz Yüze Görüşme Adresi</span>
-                  <span className="text-stone-600">Alsancak Mah. 1476/1 Sk. No:12 Katipoğlu İşmerkezi Daire:4, Konak / İzmir</span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3.5 p-4 rounded-2xl bg-white border border-[#E8DFD8]">
-                <div className="p-2.5 rounded-xl bg-[#E5ECE9] text-[#446A5E] shrink-0">
-                  <Phone className="w-5 h-5" />
-                </div>
-                <div className="text-xs">
-                  <span className="font-bold text-[#192923] block text-sm">Telefon & WhatsApp</span>
-                  <a href="tel:05306560632" className="text-stone-600 hover:text-[#446A5E] font-medium">0530 656 06 32</a>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3.5 p-4 rounded-2xl bg-white border border-[#E8DFD8]">
-                <div className="p-2.5 rounded-xl bg-[#E5ECE9] text-[#446A5E] shrink-0">
-                  <Mail className="w-5 h-5" />
-                </div>
-                <div className="text-xs">
-                  <span className="font-bold text-[#192923] block text-sm">E-Posta</span>
-                  <a href="mailto:melikeermumcu0@gmail.com" className="text-stone-600 hover:text-[#446A5E] font-medium">melikeermumcu0@gmail.com</a>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3.5 p-4 rounded-2xl bg-white border border-[#E8DFD8]">
-                <div className="p-2.5 rounded-xl bg-[#E5ECE9] text-[#446A5E] shrink-0">
-                  <svg className="w-5 h-5 fill-none stroke-current stroke-2" viewBox="0 0 24 24">
-                    <rect width="20" height="20" x="2" y="2" rx="5" ry="5"></rect>
-                    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
-                    <line x1="17.5" x2="17.51" y1="6.5" y2="6.5"></line>
-                  </svg>
-                </div>
-                <div className="text-xs">
-                  <span className="font-bold text-[#192923] block text-sm">Instagram</span>
-                  <a href="https://instagram.com/uzm.psk.melikeermumcu" target="_blank" rel="noreferrer" className="text-stone-600 hover:text-[#446A5E] font-medium">@uzm.psk.melikeermumcu</a>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Sağ Randevu Formu */}
-          <div className="lg:col-span-7 bg-white p-8 sm:p-10 rounded-3xl border border-[#E8DFD8] shadow-lg">
-            <h3 className="text-xl font-bold text-[#192923] mb-2">Randevu Talebi Formu</h3>
-            <p className="text-xs text-stone-500 mb-6">Bilgileriniz etik ve gizlilik ilkeleri çerçevesinde korunmaktadır.</p>
-
-            {status === 'success' ? (
-              <div className="p-8 rounded-2xl bg-[#E5ECE9] border border-[#446A5E]/40 text-center space-y-3">
-                <CheckCircle2 className="w-14 h-14 text-[#446A5E] mx-auto" />
-                <h4 className="text-lg font-bold text-[#192923]">Talebiniz Başarıyla İletildi!</h4>
-                <p className="text-sm text-stone-600 max-w-md mx-auto">
-                  Randevu talebiniz Klinik Psikolog Melike Ermumcu&apos;ya ulaştı. En kısa sürede sizinle iletişime geçilecektir.
+      {/* RANDEVU FORMU VE İLETİŞİM */}
+      <section id="randevu" className="py-20 bg-white border-t border-[#E8DFD8]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid lg:grid-cols-12 gap-12">
+            
+            {/* İletişim Bilgileri */}
+            <div className="lg:col-span-5 space-y-8">
+              <div className="space-y-3">
+                <span className="text-xs font-bold text-[#446A5E] uppercase tracking-widest">İletişim & Randevu</span>
+                <h2 className="text-3xl font-extrabold text-[#192923]">İlk Adımı Atın</h2>
+                <p className="text-sm text-stone-600 leading-relaxed">
+                  Yüz yüze veya online seans talebi oluşturmak için formu doldurabilir ya da doğrudan iletişim kanallarından ulaşabilirsiniz.
                 </p>
-                <button
-                  onClick={() => setStatus('idle')}
-                  className="mt-4 px-6 py-2.5 rounded-xl bg-[#446A5E] text-white text-xs font-semibold hover:bg-[#335047]"
-                >
-                  Yeni Bir Talep Gönder
-                </button>
               </div>
-            ) : (
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {status === 'error' && (
-                  <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 shrink-0" />
-                    <span>{errorMessage}</span>
-                  </div>
-                )}
 
+              <div className="space-y-4">
+                <div className="flex items-center gap-4 p-4 rounded-2xl bg-[#FAF7F2] border border-[#E8DFD8]">
+                  <Mail className="w-5 h-5 text-[#446A5E]" />
+                  <div>
+                    <p className="text-xs text-stone-500 font-medium">E-Posta</p>
+                    <p className="text-sm font-bold text-[#192923]">melikeermumcu0@gmail.com</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4 p-4 rounded-2xl bg-[#FAF7F2] border border-[#E8DFD8]">
+                  <MapPin className="w-5 h-5 text-[#446A5E]" />
+                  <div>
+                    <p className="text-xs text-stone-500 font-medium">Hizmet Şekli</p>
+                    <p className="text-sm font-bold text-[#192923]">Yüz Yüze (Antalya & Burdur) / Çevrim İçi</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4 p-4 rounded-2xl bg-[#FAF7F2] border border-[#E8DFD8]">
+                  <Clock className="w-5 h-5 text-[#446A5E]" />
+                  <div>
+                    <p className="text-xs text-stone-500 font-medium">Çalışma Saatleri</p>
+                    <p className="text-sm font-bold text-[#192923]">Pazartesi - Cumartesi: 09:00 - 19:00</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Randevu Formu */}
+            <div className="lg:col-span-7 bg-[#FAF7F2] p-8 sm:p-10 rounded-3xl border border-[#E8DFD8] shadow-sm">
+              <h3 className="text-xl font-bold text-[#192923] mb-6">Ön Görüşme & Randevu Formu</h3>
+
+              {formStatus === 'success' && (
+                <div className="p-4 mb-6 rounded-2xl bg-[#E5ECE9] border border-[#446A5E]/40 text-[#446A5E] text-xs flex items-center gap-3">
+                  <CheckCircle2 className="w-5 h-5 shrink-0" />
+                  <span>Randevu talebiniz başarıyla iletildi. En kısa sürede sizinle iletişime geçilecektir.</span>
+                </div>
+              )}
+
+              {formStatus === 'error' && (
+                <div className="p-4 mb-6 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs">
+                  Bir hata oluştu. Lütfen doğrudan e-posta ile iletişime geçiniz.
+                </div>
+              )}
+
+              <form onSubmit={handleFormSubmit} className="space-y-4">
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-[#192923] mb-1.5">Ad Soyad *</label>
+                    <label className="block text-xs font-bold text-[#192923] mb-1">Adınız Soyadınız *</label>
                     <input
                       type="text"
                       required
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      placeholder="Adınız ve Soyadınız"
-                      className="w-full px-4 py-3 rounded-xl border border-[#E8DFD8] bg-[#FAF7F2] text-sm focus:outline-none focus:border-[#446A5E] transition-colors"
+                      placeholder="Örn: Ayşe Yılmaz"
+                      className="w-full px-4 py-3 rounded-xl bg-white border border-[#E8DFD8] text-sm focus:outline-none focus:border-[#446A5E]"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-[#192923] mb-1.5">Telefon Numarası *</label>
+                    <label className="block text-xs font-bold text-[#192923] mb-1">Telefon Numaranız *</label>
                     <input
                       type="tel"
                       required
                       value={formData.phone}
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      placeholder="05XX XXX XX XX"
-                      className="w-full px-4 py-3 rounded-xl border border-[#E8DFD8] bg-[#FAF7F2] text-sm focus:outline-none focus:border-[#446A5E] transition-colors"
+                      placeholder="05xx xxx xx xx"
+                      className="w-full px-4 py-3 rounded-xl bg-white border border-[#E8DFD8] text-sm focus:outline-none focus:border-[#446A5E]"
                     />
                   </div>
                 </div>
 
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-[#192923] mb-1.5">E-Posta Adresi</label>
+                    <label className="block text-xs font-bold text-[#192923] mb-1">E-Posta Adresiniz *</label>
                     <input
                       type="email"
+                      required
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       placeholder="ornek@mail.com"
-                      className="w-full px-4 py-3 rounded-xl border border-[#E8DFD8] bg-[#FAF7F2] text-sm focus:outline-none focus:border-[#446A5E] transition-colors"
+                      className="w-full px-4 py-3 rounded-xl bg-white border border-[#E8DFD8] text-sm focus:outline-none focus:border-[#446A5E]"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-[#192923] mb-1.5">Görüşme Tercihi *</label>
+                    <label className="block text-xs font-bold text-[#192923] mb-1">Başvuru Alanı *</label>
                     <select
-                      value={formData.type}
-                      onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                      className="w-full px-4 py-3 rounded-xl border border-[#E8DFD8] bg-[#FAF7F2] text-sm focus:outline-none focus:border-[#446A5E] transition-colors text-stone-800"
+                      value={formData.service}
+                      onChange={(e) => setFormData({ ...formData, service: e.target.value })}
+                      className="w-full px-4 py-3 rounded-xl bg-white border border-[#E8DFD8] text-sm focus:outline-none focus:border-[#446A5E]"
                     >
-                      <option value="Yüz Yüze Görüşme (Alsancak / İzmir)">Yüz Yüze Görüşme (Alsancak / İzmir)</option>
-                      <option value="Online Görüşme">Online Görüşme</option>
+                      <option value="Bireysel Yetişkin Terapisi">Bireysel Yetişkin Terapisi</option>
+                      <option value="Çocuk & Oyun Terapisi">Çocuk & Oyun Terapisi</option>
+                      <option value="MOXO Dikkat Testi & Klinik Değerlendirme">MOXO & Klinik Testler</option>
+                      <option value="Ebeveyn Danışmanlığı">Ebeveyn Danışmanlığı</option>
+                      <option value="Online Terapi">Online Terapi</option>
                     </select>
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-[#192923] mb-1.5">Tercih Ettiğiniz Gün ve Saat Aralığı</label>
-                  <input
-                    type="text"
-                    value={formData.datePreference}
-                    onChange={(e) => setFormData({ ...formData, datePreference: e.target.value })}
-                    placeholder="Örn: Hafta içi öğleden sonra veya Çarşamba 14:00"
-                    className="w-full px-4 py-3 rounded-xl border border-[#E8DFD8] bg-[#FAF7F2] text-sm focus:outline-none focus:border-[#446A5E] transition-colors"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-[#192923] mb-1.5">Kısaca Başvuru Nedeniniz</label>
+                  <label className="block text-xs font-bold text-[#192923] mb-1">Tercih Edilen Gün / Notunuz</label>
                   <textarea
                     rows={3}
                     value={formData.note}
                     onChange={(e) => setFormData({ ...formData, note: e.target.value })}
-                    placeholder="Görüşmek istediğiniz konuyu özetleyebilirsiniz..."
-                    className="w-full px-4 py-3 rounded-xl border border-[#E8DFD8] bg-[#FAF7F2] text-sm focus:outline-none focus:border-[#446A5E] transition-colors"
+                    placeholder="Görüşmek istediğiniz konu veya uygun olduğunuz gün/saat aralıkları..."
+                    className="w-full px-4 py-3 rounded-xl bg-white border border-[#E8DFD8] text-sm focus:outline-none focus:border-[#446A5E]"
                   />
                 </div>
 
                 <button
                   type="submit"
-                  disabled={status === 'loading'}
-                  className="w-full py-4 rounded-xl bg-[#446A5E] text-white font-bold text-sm hover:bg-[#335047] transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                  disabled={formStatus === 'loading'}
+                  className="w-full py-4 rounded-2xl bg-[#446A5E] hover:bg-[#335047] text-white font-bold text-xs tracking-wider uppercase transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                 >
-                  {status === 'loading' ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      İletiliyor...
-                    </>
-                  ) : (
-                    'Randevu Talebini Gönder'
-                  )}
+                  <Send className="w-4 h-4" />
+                  <span>{formStatus === 'loading' ? 'İletiliyor...' : 'Randevu Talebini Gönder'}</span>
                 </button>
               </form>
-            )}
+            </div>
 
           </div>
-
         </div>
       </section>
 
-      {/* 13. Footer */}
-      <footer className="bg-[#192923] text-stone-400 py-12 border-t border-[#446A5E]/30 text-xs">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-center md:text-left">
-            <div>
-              <span className="text-lg font-bold text-[#FAF7F2] block">Klinik Psikolog Melike Ermumcu</span>
-              <span className="text-stone-400 text-xs">Alsancak, İzmir & Online Danışmanlık</span>
-            </div>
-            <div className="flex items-center gap-6">
-              <a href="#hakkimda" className="hover:text-white transition-colors">Hakkımda</a>
-              <a href="#calisma-alanlari" className="hover:text-white transition-colors">Hizmetler</a>
-              <a href="#testler" className="hover:text-white transition-colors">Testler</a>
-              <a href="#blog" className="hover:text-white transition-colors">Yazılar</a>
-              <a href="#randevu" className="hover:text-white transition-colors">Randevu</a>
-            </div>
+      {/* FOOTER */}
+      <footer className="bg-[#192923] text-[#FAF7F2] py-12 border-t border-[#FAF7F2]/10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-center gap-6 text-center sm:text-left">
+          <div>
+            <p className="text-base font-bold">Klinik Psikolog Melike Ermumcu</p>
+            <p className="text-xs text-[#FAF7F2]/60 mt-1">© 2026 Tüm Hakları Saklıdır.</p>
           </div>
-          <div className="border-t border-stone-800 pt-6 text-center text-stone-500 text-[11px]">
-            &copy; 2026 Klinik Psikolog Melike Ermumcu. Tüm hakları saklıdır. Bu sitede yer alan içerikler bilgilendirme amaçlı olup hekim tanısı yerine geçmez.
+          <div className="flex gap-6 text-xs text-[#FAF7F2]/70 font-medium">
+            <a href="#hakkimda" className="hover:text-white transition-colors">Hakkımda</a>
+            <a href="#uzmanliklar" className="hover:text-white transition-colors">Hizmetler</a>
+            <a href="#testler" className="hover:text-white transition-colors">Testler</a>
+            <a href="#randevu" className="hover:text-white transition-colors">İletişim</a>
+            <Link href="/admin" className="hover:text-white transition-colors text-[#D6AFA3]">Panel Girişi</Link>
           </div>
         </div>
       </footer>
