@@ -92,12 +92,14 @@ export default function ClientPortal() {
     if (!newMessage.trim() || !user) return;
 
     setSendingMsg(true);
+    const senderName = profile?.full_name || user.user_metadata?.full_name || user.email || 'Danışan';
+
     const { data, error } = await supabase
       .from('portal_messages')
       .insert([
         {
           sender_id: user.id,
-          sender_name: profile?.full_name || user.email,
+          sender_name: senderName,
           sender_role: 'client',
           message: newMessage.trim()
         }
@@ -105,8 +107,11 @@ export default function ClientPortal() {
       .select();
 
     if (!error && data) {
-      setMessages([...messages, data[0]]);
+      setMessages((prev) => [...prev, data[0]]);
       setNewMessage('');
+    } else if (error) {
+      console.error('Mesaj iletilemedi:', error.message);
+      alert('Mesaj gönderilemedi: ' + error.message);
     }
     setSendingMsg(false);
   };
@@ -115,13 +120,16 @@ export default function ClientPortal() {
     e.preventDefault();
     setBookingStatus('loading');
 
+    const senderName = profile?.full_name || user.user_metadata?.full_name || user.email || 'Danışan';
+    const senderPhone = profile?.phone || user.user_metadata?.phone || '';
+
     const { data, error } = await supabase
       .from('appointments')
       .insert([
         {
           client_id: user.id,
-          client_name: profile?.full_name || user.email,
-          client_phone: profile?.phone || '',
+          client_name: senderName,
+          client_phone: senderPhone,
           appointment_date: bookingData.date,
           appointment_time: bookingData.time,
           service_type: bookingData.service,
@@ -162,11 +170,11 @@ export default function ClientPortal() {
           </Link>
           <div className="flex items-center gap-4">
             <span className="text-xs font-semibold text-stone-600 hidden sm:inline">
-              {profile?.full_name || user?.email}
+              {profile?.full_name || user?.user_metadata?.full_name || user?.email}
             </span>
             <button
               onClick={handleLogout}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#FAF7F2] hover:bg-red-50 text-stone-700 hover:text-red-700 text-xs font-semibold border border-[#E8DFD8] transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#FAF7F2] hover:bg-red-50 text-stone-700 hover:text-red-700 text-xs font-semibold border border-[#E8DFD8] transition-colors cursor-pointer"
             >
               <LogOut className="w-3.5 h-3.5" /> Çıkış Yap
             </button>
@@ -185,7 +193,7 @@ export default function ClientPortal() {
             </div>
             <button
               onClick={() => setShowBooking(!showBooking)}
-              className="px-4 py-2 rounded-xl bg-[#446A5E] hover:bg-[#335047] text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm"
+              className="px-4 py-2 rounded-xl bg-[#446A5E] hover:bg-[#335047] text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
             >
               <PlusCircle className="w-4 h-4" /> {showBooking ? 'Kapat' : 'Yeni Randevu İste'}
             </button>
@@ -254,7 +262,7 @@ export default function ClientPortal() {
                 <button
                   type="submit"
                   disabled={bookingStatus === 'loading'}
-                  className="w-full py-2.5 rounded-xl bg-[#446A5E] hover:bg-[#335047] text-white font-bold text-xs transition-all"
+                  className="w-full py-2.5 rounded-xl bg-[#446A5E] hover:bg-[#335047] text-white font-bold text-xs transition-all cursor-pointer"
                 >
                   {bookingStatus === 'loading' ? 'İletiliyor...' : 'Talebi Oluştur'}
                 </button>
@@ -364,7 +372,7 @@ export default function ClientPortal() {
             <button
               type="submit"
               disabled={sendingMsg}
-              className="p-2.5 rounded-xl bg-[#446A5E] hover:bg-[#335047] text-white transition-colors disabled:opacity-50"
+              className="p-2.5 rounded-xl bg-[#446A5E] hover:bg-[#335047] text-white transition-colors disabled:opacity-50 cursor-pointer"
             >
               <Send className="w-4 h-4" />
             </button>
