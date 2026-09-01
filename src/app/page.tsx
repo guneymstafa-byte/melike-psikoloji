@@ -7,7 +7,6 @@ import {
   Sparkles, 
   Puzzle, 
   Brain, 
-  Calendar, 
   Clock, 
   MapPin, 
   Phone, 
@@ -21,7 +20,16 @@ import {
   HelpCircle,
   GraduationCap,
   Award,
-  BookOpen
+  BookOpen,
+  MessageSquare,
+  Calendar,
+  Check,
+  LogOut,
+  User,
+  Lock,
+  PlusCircle,
+  AlertCircle,
+  Sliders
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -29,7 +37,56 @@ export default function Home() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
 
-  // Form State
+  // Auth & Drawer State
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [profile, setProfile] = useState<any>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [isLoginView, setIsLoginView] = useState(true);
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState('');
+
+  // Form State (Auth)
+  const [authForm, setAuthForm] = useState({
+    fullName: '',
+    phone: '',
+    email: '',
+    password: ''
+  });
+
+  // Danışan & Admin Sekmeleri
+  const [clientTab, setClientTab] = useState<'appointments' | 'messages'>('appointments');
+  const [adminTab, setAdminTab] = useState<'appointments' | 'messages' | 'posts'>('appointments');
+
+  // Danışan Verileri
+  const [myAppointments, setMyAppointments] = useState<any[]>([]);
+  const [myMessages, setMyMessages] = useState<any[]>([]);
+  const [clientNewMsg, setClientNewMsg] = useState('');
+  const [showBooking, setShowBooking] = useState(false);
+  const [bookingData, setBookingData] = useState({
+    date: '',
+    time: '10:00',
+    service: 'Yüz Yüze Görüşme (Alsancak / İzmir)',
+    note: ''
+  });
+  const [bookingStatus, setBookingStatus] = useState<'idle' | 'loading' | 'success'>('idle');
+
+  // Yönetici Verileri
+  const [adminAppointments, setAdminAppointments] = useState<any[]>([]);
+  const [adminMessages, setAdminMessages] = useState<any[]>([]);
+  const [adminReply, setAdminReply] = useState('');
+
+  // Blog Ekleme State
+  const [blogForm, setBlogForm] = useState({
+    title: '',
+    slug: '',
+    category: 'Yetişkin Terapisi',
+    excerpt: '',
+    content: '',
+    read_time: '4 dk okuma'
+  });
+  const [blogStatus, setBlogStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+
+  // Ziyaretçi Randevu Formu State
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -40,7 +97,7 @@ export default function Home() {
   });
   const [formStatus, setFormStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
 
-  // Dinamik Blog Yazıları (Supabase'den çekilir, yoksa varsayılanlar görünür)
+  // Dinamik Blog Yazıları
   const [blogPosts, setBlogPosts] = useState<any[]>([
     {
       id: '1',
@@ -68,46 +125,222 @@ export default function Home() {
     }
   ]);
 
-  useEffect(() => {
-    async function fetchLatestPosts() {
-      try {
-        const { data, error } = await supabase
-          .from('posts')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(3);
+  const isAdmin = currentUser?.email === 'melikeermumcu0@gmail.com';
 
-        if (data && data.length > 0 && !error) {
-          setBlogPosts(data);
-        }
-      } catch (err) {
-        console.log('Bloglar yüklenirken statik veriler kullanılıyor.');
-      }
-    }
+  useEffect(() => {
+    fetchSession();
     fetchLatestPosts();
   }, []);
 
+  async function fetchSession() {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) {
+      setCurrentUser(session.user);
+      loadUserData(session.user);
+    }
+  }
+
+  async function loadUserData(user: any) {
+    // Profil
+    const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+    if (prof) setProfile(prof);
+
+    if (user.email === 'melikeermumcu0@gmail.com') {
+      // Yönetici Verileri
+      const { data: appts } = await supabase.from('appointments').select('*').order('appointment_date', { ascending: true });
+      if (appts) setAdminAppointments(appts);
+
+      const { data: msgs } = await supabase.from('portal_messages').select('*').order('created_at', { ascending: true });
+      if (msgs) setAdminMessages(msgs);
+    } else {
+      // Danışan Verileri
+      const { data: appts } = await supabase.from('appointments').select('*').eq('client_id', user.id).order('appointment_date', { ascending: true });
+      if (appts) setMyAppointments(appts);
+
+      const { data: msgs } = await supabase.from('portal_messages').select('*').order('created_at', { ascending: true });
+      if (msgs) setMyMessages(msgs);
+    }
+  }
+
+  async function fetchLatestPosts() {
+    try {
+      const { data, error } = await supabase.from('posts').select('*').order('created_at', { ascending: false });
+      if (data && data.length > 0 && !error) setBlogPosts(data);
+    } catch {
+      console.log('Bloglar yüklendi');
+    }
+  }
+
+  // Auth İşlemleri
+  const handleAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthLoading(true);
+    setAuthError('');
+
+    try {
+      if (isLoginView) {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: authForm.email,
+          password: authForm.password
+        });
+        if (error) throw error;
+        if (data.user) {
+          setCurrentUser(data.user);
+          loadUserData(data.user);
+          setAuthForm({ fullName: '', phone: '', email: '', password: '' });
+        }
+      } else {
+        const { data, error } = await supabase.auth.signUp({
+          email: authForm.email,
+          password: authForm.password,
+          options: {
+            data: { full_name: authForm.fullName, phone: authForm.phone }
+          }
+        });
+        if (error) throw error;
+        if (data.user) {
+          await supabase.from('profiles').insert([
+            {
+              id: data.user.id,
+              full_name: authForm.fullName,
+              phone: authForm.phone,
+              role: authForm.email === 'melikeermumcu0@gmail.com' ? 'admin' : 'client'
+            }
+          ]);
+          setCurrentUser(data.user);
+          loadUserData(data.user);
+          setAuthForm({ fullName: '', phone: '', email: '', password: '' });
+        }
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setAuthError(err.message === 'Invalid login credentials' ? 'E-posta adresi veya şifre hatalı.' : err.message);
+      } else {
+        setAuthError('Giriş yapılırken bir hata oluştu.');
+      }
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setCurrentUser(null);
+    setProfile(null);
+    setDrawerOpen(false);
+  };
+
+  // Danışan İşlemleri
+  const handleClientBook = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBookingStatus('loading');
+    const senderName = profile?.full_name || currentUser.user_metadata?.full_name || currentUser.email;
+    const senderPhone = profile?.phone || currentUser.user_metadata?.phone || '';
+
+    const { data, error } = await supabase.from('appointments').insert([
+      {
+        client_id: currentUser.id,
+        client_name: senderName,
+        client_phone: senderPhone,
+        appointment_date: bookingData.date,
+        appointment_time: bookingData.time,
+        service_type: bookingData.service,
+        status: 'pending',
+        note: bookingData.note
+      }
+    ]).select();
+
+    if (!error && data) {
+      setMyAppointments([...myAppointments, data[0]]);
+      setBookingStatus('success');
+      setTimeout(() => {
+        setShowBooking(false);
+        setBookingStatus('idle');
+      }, 1500);
+    }
+  };
+
+  const handleClientSendMsg = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!clientNewMsg.trim() || !currentUser) return;
+    const senderName = profile?.full_name || currentUser.user_metadata?.full_name || currentUser.email || 'Danışan';
+
+    const { data, error } = await supabase.from('portal_messages').insert([
+      {
+        sender_id: currentUser.id,
+        sender_name: senderName,
+        sender_role: 'client',
+        message: clientNewMsg.trim()
+      }
+    ]).select();
+
+    if (!error && data) {
+      setMyMessages([...myMessages, data[0]]);
+      setClientNewMsg('');
+    }
+  };
+
+  // Yönetici İşlemleri
+  const handleUpdateApptStatus = async (id: string, status: 'confirmed' | 'cancelled') => {
+    const { error } = await supabase.from('appointments').update({ status }).eq('id', id);
+    if (!error) {
+      setAdminAppointments(adminAppointments.map(a => a.id === id ? { ...a, status } : a));
+    }
+  };
+
+  const handleSendAdminReply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adminReply.trim()) return;
+
+    const { data, error } = await supabase.from('portal_messages').insert([
+      {
+        sender_id: null,
+        sender_name: 'Melike Ermumcu (Klinik Psikolog)',
+        sender_role: 'admin',
+        message: adminReply.trim()
+      }
+    ]).select();
+
+    if (!error && data) {
+      setAdminMessages([...adminMessages, data[0]]);
+      setAdminReply('');
+    }
+  };
+
+  const generateSlug = (text: string) => {
+    return text.toLowerCase().trim()
+      .replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ş/g, 's').replace(/ı/g, 'i').replace(/ö/g, 'o').replace(/ç/g, 'c')
+      .replace(/[^a-z0-9 -]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-');
+  };
+
+  const handleSavePost = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBlogStatus('loading');
+    const { data, error } = await supabase.from('posts').insert([blogForm]).select();
+
+    if (!error && data) {
+      setBlogPosts([data[0], ...blogPosts]);
+      setBlogStatus('success');
+      setBlogForm({ title: '', slug: '', category: 'Yetişkin Terapisi', excerpt: '', content: '', read_time: '4 dk okuma' });
+      setTimeout(() => setBlogStatus('idle'), 2000);
+    } else {
+      setBlogStatus('error');
+    }
+  };
+
+  // Genel Ziyaretçi Randevu Formu
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormStatus('loading');
-
     try {
       const res = await fetch('/api/appointment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
       });
-
       if (res.ok) {
         setFormStatus('success');
-        setFormData({
-          name: '',
-          email: '',
-          phone: '',
-          service: 'Yüz Yüze Görüşme (Alsancak / İzmir)',
-          date: '',
-          note: ''
-        });
+        setFormData({ name: '', email: '', phone: '', service: 'Yüz Yüze Görüşme (Alsancak / İzmir)', date: '', note: '' });
       } else {
         setFormStatus('error');
       }
@@ -163,14 +396,14 @@ export default function Home() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#FAF7F2] text-[#192923] font-sans selection:bg-[#D6AFA3] selection:text-white">
+    <div className="min-h-screen bg-[#FAF7F2] text-[#192923] font-sans selection:bg-[#D6AFA3] selection:text-white relative">
       
       {/* ÜST BİLGİ ŞERİDİ */}
       <div className="bg-[#192923] text-[#FAF7F2]/80 text-xs py-2.5 px-4 border-b border-[#FAF7F2]/10">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-2 text-center sm:text-left">
           <div className="flex items-center gap-6">
             <span className="flex items-center gap-2">
-              <MapPin className="w-3.5 h-3.5 text-[#D6AFA3]" /> Alsancak, Konak / İzmir &bull; Yüz Yüze & Online Klinik Danışmanlık
+              <MapPin className="w-3.5 h-3.5 text-[#D6AFA3]" /> Alsancak, Konak / İzmir &bull; Yüz Yüze & Online Danışmanlık
             </span>
             <span className="flex items-center gap-2">
               <Clock className="w-3.5 h-3.5 text-[#D6AFA3]" /> Pzt - Cmt: 09:00 - 19:00
@@ -189,7 +422,7 @@ export default function Home() {
       </div>
 
       {/* NAVBAR */}
-      <header className="sticky top-0 z-50 bg-[#FAF7F2]/90 backdrop-blur-md border-b border-[#E8DFD8]">
+      <header className="sticky top-0 z-40 bg-[#FAF7F2]/90 backdrop-blur-md border-b border-[#E8DFD8]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
           <Link href="/" className="flex flex-col">
             <span className="text-xl sm:text-2xl font-extrabold tracking-tight text-[#192923]">
@@ -200,34 +433,49 @@ export default function Home() {
             </span>
           </Link>
 
-          {/* Masaüstü Menü */}
+          {/* Menü */}
           <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-[#192923]/80">
             <a href="#hakkimda" className="hover:text-[#446A5E] transition-colors">Hakkımda</a>
             <a href="#uzmanliklar" className="hover:text-[#446A5E] transition-colors">Uzmanlıklar</a>
             <a href="#testler" className="hover:text-[#446A5E] transition-colors">Klinik Testler</a>
-            <a href="#blog" className="hover:text-[#446A5E] transition-colors">Yazılar & Blog</a>
+            <a href="#blog" className="hover:text-[#446A5E] transition-colors">Yazılar</a>
             <a href="#sss" className="hover:text-[#446A5E] transition-colors">Sıkça Sorulanlar</a>
           </nav>
 
-        <div className="hidden md:flex items-center gap-3">
-  <Link
-    href="/giris"
-    className="px-4 py-2.5 rounded-full bg-[#FAF7F2] hover:bg-[#E5ECE9] text-[#446A5E] border border-[#446A5E]/30 text-xs font-semibold tracking-wide transition-all duration-200"
-  >
-    Danışan Girişi
-  </Link>
-  <a
-    href="#randevu"
-    className="px-5 py-2.5 rounded-full bg-[#446A5E] hover:bg-[#335047] text-white text-xs font-semibold tracking-wide shadow-sm hover:shadow transition-all duration-200"
-  >
-    Randevu Oluştur
-  </a>
-</div>
+          {/* Sağ Butonlar (Trendyol Tarzı) */}
+          <div className="hidden md:flex items-center gap-3">
+            {currentUser ? (
+              <button
+                onClick={() => setDrawerOpen(true)}
+                className={`px-4 py-2.5 rounded-full text-xs font-bold flex items-center gap-2 transition-all cursor-pointer shadow-sm ${
+                  isAdmin 
+                    ? 'bg-[#192923] text-[#D6AFA3] border border-[#D6AFA3]/30 hover:bg-black' 
+                    : 'bg-[#FAF7F2] text-[#446A5E] border border-[#446A5E]/40 hover:bg-[#E5ECE9]'
+                }`}
+              >
+                <User className="w-3.5 h-3.5" />
+                <span>{isAdmin ? 'Yönetici Paneli' : (profile?.full_name || currentUser.user_metadata?.full_name || 'Hesabım')}</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => { setIsLoginView(true); setDrawerOpen(true); }}
+                className="px-4 py-2.5 rounded-full bg-[#FAF7F2] hover:bg-[#E5ECE9] text-[#446A5E] border border-[#446A5E]/30 text-xs font-semibold tracking-wide transition-all cursor-pointer"
+              >
+                Giriş Yap / Kayıt
+              </button>
+            )}
 
-          {/* Mobil Menü Butonu */}
+            <a
+              href="#randevu"
+              className="px-5 py-2.5 rounded-full bg-[#446A5E] hover:bg-[#335047] text-white text-xs font-semibold tracking-wide shadow-sm hover:shadow transition-all"
+            >
+              Randevu Oluştur
+            </a>
+          </div>
+
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden p-2 text-[#192923] hover:text-[#446A5E]"
+            className="md:hidden p-2 text-[#192923]"
           >
             {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
@@ -236,56 +484,24 @@ export default function Home() {
         {/* Mobil Menü */}
         {mobileMenuOpen && (
           <div className="md:hidden bg-[#FAF7F2] border-b border-[#E8DFD8] px-4 pt-2 pb-6 space-y-3">
-            <a
-              href="#hakkimda"
-              onClick={() => setMobileMenuOpen(false)}
-              className="block py-2 text-sm font-medium text-[#192923]"
+            <a href="#hakkimda" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-sm font-medium text-[#192923]">Hakkımda</a>
+            <a href="#uzmanliklar" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-sm font-medium text-[#192923]">Uzmanlıklar</a>
+            <a href="#testler" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-sm font-medium text-[#192923]">Klinik Testler</a>
+            <a href="#blog" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-sm font-medium text-[#192923]">Yazılar</a>
+            <a href="#sss" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-sm font-medium text-[#192923]">Sıkça Sorulanlar</a>
+            <button
+              onClick={() => { setMobileMenuOpen(false); setDrawerOpen(true); }}
+              className="block w-full text-center py-2.5 rounded-full bg-[#446A5E] text-white text-xs font-bold cursor-pointer"
             >
-              Hakkımda
-            </a>
-            <a
-              href="#uzmanliklar"
-              onClick={() => setMobileMenuOpen(false)}
-              className="block py-2 text-sm font-medium text-[#192923]"
-            >
-              Uzmanlıklar
-            </a>
-            <a
-              href="#testler"
-              onClick={() => setMobileMenuOpen(false)}
-              className="block py-2 text-sm font-medium text-[#192923]"
-            >
-              Klinik Testler
-            </a>
-            <a
-              href="#blog"
-              onClick={() => setMobileMenuOpen(false)}
-              className="block py-2 text-sm font-medium text-[#192923]"
-            >
-              Yazılar & Blog
-            </a>
-            <a
-              href="#sss"
-              onClick={() => setMobileMenuOpen(false)}
-              className="block py-2 text-sm font-medium text-[#192923]"
-            >
-              Sıkça Sorulanlar
-            </a>
-            <a
-              href="#randevu"
-              onClick={() => setMobileMenuOpen(false)}
-              className="block w-full text-center py-3 rounded-full bg-[#446A5E] text-white text-xs font-bold"
-            >
-              Randevu Oluştur
-            </a>
+              {currentUser ? (isAdmin ? 'Yönetici Paneli' : 'Hesabım') : 'Giriş Yap / Kayıt Ol'}
+            </button>
           </div>
         )}
       </header>
 
-      {/* HERO BÖLÜMÜ (Fotoğrafsız & Dengeli Tasarım) */}
+      {/* HERO BÖLÜMÜ */}
       <section className="relative pt-16 pb-20 sm:pt-24 sm:pb-28 overflow-hidden">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-8">
-          
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#E5ECE9] border border-[#446A5E]/20 text-[#446A5E] text-xs font-semibold">
             <ShieldCheck className="w-4 h-4" />
             <span>Akredite & Bilimsel Terapi Ekolleri</span>
@@ -302,7 +518,7 @@ export default function Home() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
             <a
               href="#randevu"
-              className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-[#446A5E] hover:bg-[#335047] text-white text-sm font-semibold shadow-lg shadow-[#446A5E]/20 hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-2 group"
+              className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-[#446A5E] hover:bg-[#335047] text-white text-sm font-semibold shadow-lg shadow-[#446A5E]/20 hover:shadow-xl transition-all flex items-center justify-center gap-2 group"
             >
               <span>Randevu Talebi İletin</span>
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -313,14 +529,11 @@ export default function Home() {
               rel="noreferrer"
               className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-[#F5EAE5] border border-[#D6AFA3] text-[#192923] text-sm font-semibold hover:bg-[#EBDCD6] transition-all text-center flex items-center justify-center gap-2"
             >
-              <svg className="w-4 h-4 fill-current text-[#446A5E]" viewBox="0 0 24 24">
-                <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.312.045-.694.076-2.122-.516-1.534-.636-2.529-2.186-2.607-2.29-.076-.104-.627-.834-.627-1.59 0-.756.396-1.127.536-1.28.14-.153.307-.191.41-.191.103 0 .205.001.296.006.096.004.225-.036.352.27.13.312.446 1.085.485 1.164.039.079.065.172.013.276-.052.104-.078.169-.155.26-.078.091-.163.203-.233.273-.078.079-.16.165-.069.321.091.156.405.668.87 1.082.599.534 1.104.699 1.26.778.156.078.247.069.338-.035.091-.104.39-.455.494-.611.104-.156.208-.13.351-.078.144.052.91.43 1.066.508.156.078.26.117.299.182.039.065.039.378-.105.783z"/>
-              </svg>
+              <Phone className="w-4 h-4 text-[#446A5E]" />
               WhatsApp ile Danışın
             </a>
           </div>
 
-          {/* Güven Rozetleri */}
           <div className="grid grid-cols-3 gap-4 pt-8 border-t border-[#E8DFD8] max-w-2xl mx-auto">
             <div>
               <p className="text-xl sm:text-2xl font-bold text-[#192923]">Klinik Psikoloji</p>
@@ -335,7 +548,6 @@ export default function Home() {
               <p className="text-xs text-stone-500 font-medium">Gizlilik & Etik İlke</p>
             </div>
           </div>
-
         </div>
       </section>
 
@@ -343,39 +555,30 @@ export default function Home() {
       <section id="hakkimda" className="py-20 bg-white border-y border-[#E8DFD8]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-12 gap-12 items-center">
-            
             <div className="lg:col-span-6 space-y-6">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#F5EAE5] text-[#8C7A6B] text-xs font-bold uppercase tracking-wider">
                 <GraduationCap className="w-4 h-4 text-[#D6AFA3]" />
                 <span>Akademik Geçmiş & Vizyon</span>
               </div>
-              
               <h2 className="text-3xl sm:text-4xl font-extrabold text-[#192923] leading-tight">
                 Her bireyin ve çocuğun kendi iyileşme potansiyeli vardır.
               </h2>
-
               <p className="text-stone-600 text-sm sm:text-base leading-relaxed">
-                Uluslararası Kıbrıs Üniversitesi Psikoloji lisans programını 3.65 onur derecesiyle tamamladıktan sonra, aynı üniversitede Klinik Psikoloji Yüksek Lisans eğitimimi başarıyla tamamladım. Bilişsel Davranışçı Terapi ekolü çerçevesinde bireylerin düşünce kalıplarını yeniden yapılandırmalarına ve duygusal direnç kazanmalarına eşlik ediyorum.
+                Uluslararası Kıbrıs Üniversitesi Psikoloji lisans programını 3.65 onur derecesiyle tamamladıktan sonra, aynı üniversitede Klinik Psikoloji Yüksek Lisans eğitimimi başarıyla tamamladım. Bilişsel Davranışçı Terapi ekolü çerçevesinde bireylerin düşünce kalıplarını yeniden yapılandırmalarına eşlik ediyorum.
               </p>
-
-              <p className="text-stone-600 text-sm sm:text-base leading-relaxed">
-                Çocuklarla yürüttüğüm çalışmalarda ise oyunun dönüştürücü ve onarıcı gücünden faydalanıyorum. Seans odasını; yargısız, kabul edici ve tamamen danışanın ritmine göre şekillenen bir güven alanı olarak tasarlıyorum.
-              </p>
-
               <div className="grid sm:grid-cols-2 gap-4 pt-2">
                 <div className="p-4 rounded-2xl bg-[#FAF7F2] border border-[#E8DFD8] flex items-start gap-3">
                   <Award className="w-5 h-5 text-[#446A5E] shrink-0 mt-0.5" />
                   <div>
                     <h4 className="text-xs font-bold text-[#192923]">BDT Uygulayıcısı</h4>
-                    <p className="text-[11px] text-stone-500 mt-0.5">Bilişsel Davranışçı Psikoterapiler Derneği Akreditasyonu</p>
+                    <p className="text-[11px] text-stone-500 mt-0.5">Bilişsel Davranışçı Psikoterapiler Derneği</p>
                   </div>
                 </div>
-
                 <div className="p-4 rounded-2xl bg-[#FAF7F2] border border-[#E8DFD8] flex items-start gap-3">
                   <BookOpen className="w-5 h-5 text-[#D6AFA3] shrink-0 mt-0.5" />
                   <div>
-                    <h4 className="text-xs font-bold text-[#192923]">Oyun Terapisi Uzmanlığı</h4>
-                    <p className="text-[11px] text-stone-500 mt-0.5">Çocuk Merkezli ve Deneyimsel Oyun Ekolü</p>
+                    <h4 className="text-xs font-bold text-[#192923]">Oyun Terapisi</h4>
+                    <p className="text-[11px] text-stone-500 mt-0.5">Çocuk Merkezli & Deneyimsel Oyun Ekolü</p>
                   </div>
                 </div>
               </div>
@@ -383,34 +586,30 @@ export default function Home() {
 
             <div className="lg:col-span-6 bg-[#FAF7F2] p-8 sm:p-10 rounded-3xl border border-[#E8DFD8] space-y-6">
               <h3 className="text-xl font-bold text-[#192923]">Çalışma İlkelerim</h3>
-              
               <div className="space-y-4">
                 <div className="flex gap-4">
                   <div className="w-8 h-8 rounded-xl bg-[#E5ECE9] text-[#446A5E] flex items-center justify-center shrink-0 font-bold text-xs">01</div>
                   <div>
                     <h5 className="text-sm font-bold text-[#192923]">Bireye Özgü Yaklaşım</h5>
-                    <p className="text-xs text-stone-600 mt-1">Her danışanın yaşam serüveni biriciktir; terapi haritası kişisel ihtiyaçlara göre özelleştirilir.</p>
+                    <p className="text-xs text-stone-600 mt-1">Terapi haritası tamamen kişinin ihtiyaçlarına göre özelleştirilir.</p>
                   </div>
                 </div>
-
                 <div className="flex gap-4">
                   <div className="w-8 h-8 rounded-xl bg-[#E5ECE9] text-[#446A5E] flex items-center justify-center shrink-0 font-bold text-xs">02</div>
                   <div>
                     <h5 className="text-sm font-bold text-[#192923]">Bilimsel ve Kanıta Dayalı Ekoller</h5>
-                    <p className="text-xs text-stone-600 mt-1">Uluslararası geçerliliği kanıtlanmış psikoterapi ekolleri ve geçerli test bataryaları kullanılır.</p>
+                    <p className="text-xs text-stone-600 mt-1">Uluslararası geçerliliği kanıtlanmış psikoterapi modelleri kullanılır.</p>
                   </div>
                 </div>
-
                 <div className="flex gap-4">
                   <div className="w-8 h-8 rounded-xl bg-[#E5ECE9] text-[#446A5E] flex items-center justify-center shrink-0 font-bold text-xs">03</div>
                   <div>
-                    <h5 className="text-sm font-bold text-[#192923]">Mutlak Gizlilik ve Etik Standartlar</h5>
-                    <p className="text-xs text-stone-600 mt-1">Türk Psikologlar Derneği etik yönetmeliği ilkelerine titizlikle bağlı kalınır.</p>
+                    <h5 className="text-sm font-bold text-[#192923]">Mutlak Gizlilik</h5>
+                    <p className="text-xs text-stone-600 mt-1">Türk Psikologlar Derneği etik yönetmeliği ilkelerine titizlikle uyulur.</p>
                   </div>
                 </div>
               </div>
             </div>
-
           </div>
         </div>
       </section>
@@ -421,15 +620,10 @@ export default function Home() {
           <div className="text-center max-w-2xl mx-auto space-y-3 mb-16">
             <span className="text-xs font-bold text-[#446A5E] uppercase tracking-widest">Hizmet Alanları</span>
             <h2 className="text-3xl sm:text-4xl font-extrabold text-[#192923]">Klinik Hizmetler & Terapi Alanları</h2>
-            <p className="text-sm text-stone-600">Her yaş grubuna ve ihtiyaca yönelik yapılandırılmış profesyonel seans süreçleri.</p>
           </div>
-
           <div className="grid md:grid-cols-2 gap-8">
             {services.map((svc, idx) => (
-              <div
-                key={idx}
-                className="bg-white p-8 rounded-3xl border border-[#E8DFD8] shadow-sm hover:shadow-md transition-all space-y-5 flex flex-col justify-between"
-              >
+              <div key={idx} className="bg-white p-8 rounded-3xl border border-[#E8DFD8] shadow-sm space-y-5 flex flex-col justify-between">
                 <div className="space-y-4">
                   <div className="w-14 h-14 rounded-2xl bg-[#FAF7F2] border border-[#E8DFD8] flex items-center justify-center">
                     {svc.icon}
@@ -439,10 +633,7 @@ export default function Home() {
                 </div>
                 <div className="flex flex-wrap gap-2 pt-4 border-t border-[#E8DFD8]/60">
                   {svc.tags.map((tag, tIdx) => (
-                    <span
-                      key={tIdx}
-                      className="text-[11px] font-semibold px-3 py-1 rounded-full bg-[#FAF7F2] text-stone-600 border border-[#E8DFD8]"
-                    >
+                    <span key={tIdx} className="text-[11px] font-semibold px-3 py-1 rounded-full bg-[#FAF7F2] text-stone-600 border border-[#E8DFD8]">
                       {tag}
                     </span>
                   ))}
@@ -453,74 +644,53 @@ export default function Home() {
         </div>
       </section>
 
-      {/* PSİKOLOJİK DEĞERLENDİRME VE TESTLER (YENİLENMİŞ İÇERİK) */}
+      {/* KLİNİK TESTLER */}
       <section id="testler" className="py-20 bg-[#FAF7F2] border-t border-[#E8DFD8]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="bg-[#192923] text-white rounded-3xl p-8 sm:p-14 overflow-hidden relative shadow-2xl">
             <div className="relative z-10 max-w-3xl space-y-6">
               <span className="text-xs font-bold text-[#D6AFA3] uppercase tracking-widest">Klinik Ölçümleme</span>
-              <h2 className="text-3xl sm:text-4xl font-extrabold leading-tight">
-                Psikolojik Değerlendirme ve Testler
-              </h2>
+              <h2 className="text-3xl sm:text-4xl font-extrabold leading-tight">Psikolojik Değerlendirme ve Testler</h2>
               <p className="text-sm sm:text-base text-[#FAF7F2]/80 leading-relaxed">
                 Çocuk ve ergenlerin gelişimsel, bilişsel, dikkat ve duygusal özelliklerini daha kapsamlı değerlendirmek amacıyla, ihtiyaç doğrultusunda çeşitli psikolojik değerlendirme araçlarından yararlanıyorum.
               </p>
-
               <div className="space-y-4 pt-4 border-t border-white/10">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-[#D6AFA3]">
-                  Uygulanan Klinik Değerlendirme & Gelişim Testleri:
-                </h3>
-
+                <h3 className="text-xs font-bold uppercase tracking-wider text-[#D6AFA3]">Uygulanan Klinik Değerlendirme & Gelişim Testleri:</h3>
                 <div className="grid sm:grid-cols-2 gap-4">
-                  <div className="bg-white/10 backdrop-blur-sm p-4 rounded-2xl border border-white/10 space-y-1">
+                  <div className="bg-white/10 p-4 rounded-2xl border border-white/10 space-y-1">
                     <h4 className="text-sm font-bold text-white">Ankara Gelişim Tarama Envanteri (AGTE)</h4>
                     <p className="text-xs text-[#FAF7F2]/75">Gelişimsel değerlendirme</p>
                   </div>
-
-                  <div className="bg-white/10 backdrop-blur-sm p-4 rounded-2xl border border-white/10 space-y-1">
+                  <div className="bg-white/10 p-4 rounded-2xl border border-white/10 space-y-1">
                     <h4 className="text-sm font-bold text-white">d2 Dikkat Testi</h4>
                     <p className="text-xs text-[#FAF7F2]/75">Dikkat ve seçici dikkat süreçlerinin değerlendirilmesi</p>
                   </div>
-
-                  <div className="bg-white/10 backdrop-blur-sm p-4 rounded-2xl border border-white/10 space-y-1">
+                  <div className="bg-white/10 p-4 rounded-2xl border border-white/10 space-y-1">
                     <h4 className="text-sm font-bold text-white">Metropolitan Okul Olgunluğu Testi</h4>
                     <p className="text-xs text-[#FAF7F2]/75">Okula hazırlık ve okul olgunluğunun değerlendirilmesi</p>
                   </div>
-
-                  <div className="bg-white/10 backdrop-blur-sm p-4 rounded-2xl border border-white/10 space-y-1">
+                  <div className="bg-white/10 p-4 rounded-2xl border border-white/10 space-y-1">
                     <h4 className="text-sm font-bold text-white">Çizim Testleri</h4>
-                    <p className="text-xs text-[#FAF7F2]/75">Çocuğun gelişimsel ve duygusal özelliklerinin değerlendirilmesine yönelik projektif değerlendirme araçları</p>
+                    <p className="text-xs text-[#FAF7F2]/75">Projektif gelişimsel ve duygusal değerlendirme</p>
                   </div>
-
-                  <div className="sm:col-span-2 bg-white/10 backdrop-blur-sm p-4 rounded-2xl border border-white/10 space-y-1">
+                  <div className="sm:col-span-2 bg-white/10 p-4 rounded-2xl border border-white/10 space-y-1">
                     <h4 className="text-sm font-bold text-white">Duygu Durumu Değerlendirme Ölçekleri</h4>
-                    <p className="text-xs text-[#FAF7F2]/75">Çocuk ve ergenlerde duygu durumu ve psikolojik belirtilerin değerlendirilmesine yardımcı ölçme araçları</p>
+                    <p className="text-xs text-[#FAF7F2]/75">Çocuk ve ergenlerde duygu durumu ve psikolojik belirtilerin değerlendirilmesi</p>
                   </div>
                 </div>
               </div>
-
             </div>
           </div>
         </div>
       </section>
 
-      {/* BLOG BÖLÜMÜ (CANLI SUPABASE BAĞLANTILI) */}
+      {/* BLOG BÖLÜMÜ */}
       <section id="blog" className="py-20 bg-white border-y border-[#E8DFD8]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 mb-12">
-            <div className="space-y-2">
-              <span className="text-xs font-bold text-[#446A5E] uppercase tracking-widest">Psikoloji Kütüphanesi</span>
-              <h2 className="text-3xl font-extrabold text-[#192923]">Yazılar & Makaleler</h2>
-              <p className="text-xs sm:text-sm text-stone-500">Ruh sağlığı, çocuk gelişimi ve terapötik farkındalık üzerine yazılar.</p>
-            </div>
-            <Link
-              href="/admin"
-              className="text-xs text-[#446A5E] hover:text-[#335047] font-bold underline cursor-pointer"
-            >
-              Yönetici Paneli (Yazı Ekle) →
-            </Link>
+          <div className="space-y-2 mb-12">
+            <span className="text-xs font-bold text-[#446A5E] uppercase tracking-widest">Psikoloji Kütüphanesi</span>
+            <h2 className="text-3xl font-extrabold text-[#192923]">Yazılar & Makaleler</h2>
           </div>
-
           <div className="grid md:grid-cols-3 gap-8">
             {blogPosts.map((post) => (
               <Link
@@ -561,13 +731,9 @@ export default function Home() {
             <span className="text-xs font-bold text-[#446A5E] uppercase tracking-widest">Merak Edilenler</span>
             <h2 className="text-3xl font-extrabold text-[#192923]">Sıkça Sorulan Sorular</h2>
           </div>
-
           <div className="space-y-4">
             {faqs.map((faq, idx) => (
-              <div
-                key={idx}
-                className="bg-white rounded-2xl border border-[#E8DFD8] overflow-hidden transition-all"
-              >
+              <div key={idx} className="bg-white rounded-2xl border border-[#E8DFD8] overflow-hidden">
                 <button
                   onClick={() => setActiveFaq(activeFaq === idx ? null : idx)}
                   className="w-full p-5 text-left flex justify-between items-center gap-4 cursor-pointer"
@@ -576,9 +742,7 @@ export default function Home() {
                     <HelpCircle className="w-4 h-4 text-[#446A5E] shrink-0" />
                     {faq.q}
                   </span>
-                  <span className="text-xl font-bold text-stone-400">
-                    {activeFaq === idx ? '−' : '+'}
-                  </span>
+                  <span className="text-xl font-bold text-stone-400">{activeFaq === idx ? '−' : '+'}</span>
                 </button>
                 {activeFaq === idx && (
                   <div className="px-5 pb-5 text-xs sm:text-sm text-stone-600 leading-relaxed border-t border-[#FAF7F2] pt-3">
@@ -595,75 +759,49 @@ export default function Home() {
       <section id="randevu" className="py-20 bg-white border-t border-[#E8DFD8]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-12 gap-12">
-            
-            {/* İletişim Bilgileri */}
             <div className="lg:col-span-5 space-y-8">
               <div className="space-y-3">
                 <span className="text-xs font-bold text-[#446A5E] uppercase tracking-widest">İletişim & Randevu</span>
                 <h2 className="text-3xl font-extrabold text-[#192923]">İlk Adımı Atın</h2>
                 <p className="text-sm text-stone-600 leading-relaxed">
-                  Yüz yüze veya online seans talebi oluşturmak için formu doldurabilir ya da doğrudan iletişim kanallarından ulaşabilirsiniz.
+                  Yüz yüze veya online seans talebi oluşturmak için formu doldurabilirsiniz.
                 </p>
               </div>
-
               <div className="space-y-4">
                 <div className="flex items-start gap-4 p-4 rounded-2xl bg-[#FAF7F2] border border-[#E8DFD8]">
                   <MapPin className="w-5 h-5 text-[#446A5E] shrink-0 mt-0.5" />
                   <div>
                     <p className="text-xs text-stone-500 font-medium">Yüz Yüze Görüşme Adresi</p>
-                    <p className="text-xs sm:text-sm font-bold text-[#192923] leading-relaxed">
-                      Alsancak Mah. 1476/1 Sk. No:12 Katipoğlu İşmerkezi Daire:4, Alsancak, 35200 Konak / İzmir
+                    <p className="text-xs sm:text-sm font-bold text-[#192923]">
+                      Alsancak Mah. 1476/1 Sk. No:12 Katipoğlu İşmerkezi Daire:4, Alsancak, Konak / İzmir
                     </p>
                   </div>
                 </div>
-
                 <div className="flex items-center gap-4 p-4 rounded-2xl bg-[#FAF7F2] border border-[#E8DFD8]">
                   <Phone className="w-5 h-5 text-[#446A5E]" />
                   <div>
                     <p className="text-xs text-stone-500 font-medium">Telefon & WhatsApp</p>
-                    <a href="tel:05306560632" className="text-sm font-bold text-[#192923] hover:text-[#446A5E] transition-colors">
-                      0530 656 06 32
-                    </a>
+                    <a href="tel:05306560632" className="text-sm font-bold text-[#192923] hover:text-[#446A5E]">0530 656 06 32</a>
                   </div>
                 </div>
-
                 <div className="flex items-center gap-4 p-4 rounded-2xl bg-[#FAF7F2] border border-[#E8DFD8]">
                   <Mail className="w-5 h-5 text-[#446A5E]" />
                   <div>
                     <p className="text-xs text-stone-500 font-medium">E-Posta</p>
-                    <a href="mailto:melikeermumcu0@gmail.com" className="text-sm font-bold text-[#192923] hover:text-[#446A5E] transition-colors">
-                      melikeermumcu0@gmail.com
-                    </a>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-4 p-4 rounded-2xl bg-[#FAF7F2] border border-[#E8DFD8]">
-                  <Clock className="w-5 h-5 text-[#446A5E]" />
-                  <div>
-                    <p className="text-xs text-stone-500 font-medium">Çalışma Saatleri</p>
-                    <p className="text-sm font-bold text-[#192923]">Pazartesi - Cumartesi: 09:00 - 19:00</p>
+                    <a href="mailto:melikeermumcu0@gmail.com" className="text-sm font-bold text-[#192923] hover:text-[#446A5E]">melikeermumcu0@gmail.com</a>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Randevu Formu */}
             <div className="lg:col-span-7 bg-[#FAF7F2] p-8 sm:p-10 rounded-3xl border border-[#E8DFD8] shadow-sm">
               <h3 className="text-xl font-bold text-[#192923] mb-6">Ön Görüşme & Randevu Formu</h3>
-
               {formStatus === 'success' && (
                 <div className="p-4 mb-6 rounded-2xl bg-[#E5ECE9] border border-[#446A5E]/40 text-[#446A5E] text-xs flex items-center gap-3">
                   <CheckCircle2 className="w-5 h-5 shrink-0" />
                   <span>Randevu talebiniz başarıyla iletildi. En kısa sürede sizinle iletişime geçilecektir.</span>
                 </div>
               )}
-
-              {formStatus === 'error' && (
-                <div className="p-4 mb-6 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs">
-                  Bir hata oluştu. Lütfen doğrudan e-posta ile iletişime geçiniz.
-                </div>
-              )}
-
               <form onSubmit={handleFormSubmit} className="space-y-4">
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div>
@@ -689,7 +827,6 @@ export default function Home() {
                     />
                   </div>
                 </div>
-
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-[#192923] mb-1">E-Posta Adresiniz *</label>
@@ -703,44 +840,40 @@ export default function Home() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-[#192923] mb-1">Görüşme Tercihi / Hizmet Alanı *</label>
+                    <label className="block text-xs font-bold text-[#192923] mb-1">Hizmet Alanı *</label>
                     <select
                       value={formData.service}
                       onChange={(e) => setFormData({ ...formData, service: e.target.value })}
                       className="w-full px-4 py-3 rounded-xl bg-white border border-[#E8DFD8] text-sm focus:outline-none focus:border-[#446A5E]"
                     >
                       <option value="Yüz Yüze Görüşme (Alsancak / İzmir)">Yüz Yüze Görüşme (Alsancak / İzmir)</option>
-                      <option value="Online Görüşme">Online Terapi / Görüşme</option>
+                      <option value="Online Görüşme">Online Görüşme</option>
                       <option value="Bireysel Yetişkin Terapisi">Bireysel Yetişkin Terapisi</option>
                       <option value="Çocuk & Oyun Terapisi">Çocuk & Oyun Terapisi</option>
                       <option value="Psikolojik Değerlendirme ve Testler">Psikolojik Değerlendirme ve Testler</option>
-                      <option value="Ebeveyn Danışmanlığı">Ebeveyn Danışmanlığı</option>
                     </select>
                   </div>
                 </div>
-
                 <div>
-                  <label className="block text-xs font-bold text-[#192923] mb-1">Tercih Edilen Gün / Notunuz</label>
+                  <label className="block text-xs font-bold text-[#192923] mb-1">Notunuz</label>
                   <textarea
                     rows={3}
                     value={formData.note}
                     onChange={(e) => setFormData({ ...formData, note: e.target.value })}
-                    placeholder="Görüşmek istediğiniz konu veya uygun olduğunuz gün/saat aralıkları..."
+                    placeholder="Görüşmek istediğiniz konu..."
                     className="w-full px-4 py-3 rounded-xl bg-white border border-[#E8DFD8] text-sm focus:outline-none focus:border-[#446A5E]"
                   />
                 </div>
-
                 <button
                   type="submit"
                   disabled={formStatus === 'loading'}
-                  className="w-full py-4 rounded-2xl bg-[#446A5E] hover:bg-[#335047] text-white font-bold text-xs tracking-wider uppercase transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  className="w-full py-4 rounded-2xl bg-[#446A5E] hover:bg-[#335047] text-white font-bold text-xs tracking-wider uppercase transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <Send className="w-4 h-4" />
                   <span>{formStatus === 'loading' ? 'İletiliyor...' : 'Randevu Talebini Gönder'}</span>
                 </button>
               </form>
             </div>
-
           </div>
         </div>
       </section>
@@ -753,18 +886,349 @@ export default function Home() {
             <p className="text-xs text-[#FAF7F2]/60 mt-1">Alsancak, İzmir & Online Danışmanlık &bull; &copy; 2026 Tüm Hakları Saklıdır.</p>
           </div>
           <div className="flex gap-6 text-xs text-[#FAF7F2]/70 font-medium">
-<div className="flex gap-6 text-xs text-[#FAF7F2]/70 font-medium">
-  <a href="#hakkimda" className="hover:text-white transition-colors">Hakkımda</a>
-  <a href="#uzmanliklar" className="hover:text-white transition-colors">Hizmetler</a>
-  <a href="#testler" className="hover:text-white transition-colors">Testler</a>
-  <a href="#blog" className="hover:text-white transition-colors">Yazılar</a>
-  <a href="#randevu" className="hover:text-white transition-colors">İletişim</a>
-  <Link href="/giris" className="hover:text-white transition-colors text-[#D6AFA3]">Danışan Girişi</Link>
-  <Link href="/admin" className="hover:text-white transition-colors text-stone-500">Panel</Link>
-</div>
+            <a href="#hakkimda" className="hover:text-white transition-colors">Hakkımda</a>
+            <a href="#uzmanliklar" className="hover:text-white transition-colors">Hizmetler</a>
+            <a href="#testler" className="hover:text-white transition-colors">Testler</a>
+            <a href="#blog" className="hover:text-white transition-colors">Yazılar</a>
+            <a href="#randevu" className="hover:text-white transition-colors">İletişim</a>
           </div>
         </div>
       </footer>
+
+      {/* ============================================================ */}
+      {/* SAĞDAN AÇILAN HESAP & YÖNETİCİ ÇEKMECESİ (DRAWER) */}
+      {/* ============================================================ */}
+      {drawerOpen && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs transition-opacity">
+          <div className="w-full max-w-md bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
+            
+            {/* Header */}
+            <div className="p-4 bg-[#192923] text-[#FAF7F2] flex items-center justify-between border-b border-[#FAF7F2]/10">
+              <div className="flex items-center gap-2">
+                <User className="w-4 h-4 text-[#D6AFA3]" />
+                <div>
+                  <h3 className="text-sm font-extrabold">
+                    {currentUser 
+                      ? (isAdmin ? 'Psikolog Yönetici Paneli' : (profile?.full_name || currentUser.user_metadata?.full_name || 'Danışan Hesabı'))
+                      : (isLoginView ? 'Danışan Girişi' : 'Yeni Kayıt')}
+                  </h3>
+                  {currentUser && <p className="text-[10px] text-[#FAF7F2]/60">{currentUser.email}</p>}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {currentUser && (
+                  <button onClick={handleLogout} title="Çıkış Yap" className="p-1.5 rounded-lg bg-white/10 hover:bg-red-500/20 text-stone-300 hover:text-red-300 transition-colors cursor-pointer">
+                    <LogOut className="w-4 h-4" />
+                  </button>
+                )}
+                <button onClick={() => setDrawerOpen(false)} className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white cursor-pointer">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Çekmece İçeriği */}
+            <div className="flex-1 overflow-y-auto p-5 text-xs">
+              
+              {/* 1. GİRİŞ YAPILMAMIŞSA (AUTH FORMU) */}
+              {!currentUser && (
+                <div className="space-y-4 pt-4">
+                  {authError && (
+                    <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                      <span>{authError}</span>
+                    </div>
+                  )}
+
+                  <form onSubmit={handleAuth} className="space-y-3">
+                    {!isLoginView && (
+                      <>
+                        <div>
+                          <label className="block text-xs font-bold text-[#192923] mb-1">Ad Soyad</label>
+                          <input
+                            type="text"
+                            required
+                            value={authForm.fullName}
+                            onChange={(e) => setAuthForm({ ...authForm, fullName: e.target.value })}
+                            placeholder="Adınız ve Soyadınız"
+                            className="w-full px-3 py-2 rounded-xl border border-[#E8DFD8] bg-[#FAF7F2] text-xs"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-[#192923] mb-1">Telefon</label>
+                          <input
+                            type="tel"
+                            required
+                            value={authForm.phone}
+                            onChange={(e) => setAuthForm({ ...authForm, phone: e.target.value })}
+                            placeholder="05xx xxx xx xx"
+                            className="w-full px-3 py-2 rounded-xl border border-[#E8DFD8] bg-[#FAF7F2] text-xs"
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    <div>
+                      <label className="block text-xs font-bold text-[#192923] mb-1">E-Posta</label>
+                      <input
+                        type="email"
+                        required
+                        value={authForm.email}
+                        onChange={(e) => setAuthForm({ ...authForm, email: e.target.value })}
+                        placeholder="ornek@mail.com"
+                        className="w-full px-3 py-2 rounded-xl border border-[#E8DFD8] bg-[#FAF7F2] text-xs"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-[#192923] mb-1">Şifre</label>
+                      <input
+                        type="password"
+                        required
+                        minLength={6}
+                        value={authForm.password}
+                        onChange={(e) => setAuthForm({ ...authForm, password: e.target.value })}
+                        placeholder="En az 6 karakter"
+                        className="w-full px-3 py-2 rounded-xl border border-[#E8DFD8] bg-[#FAF7F2] text-xs"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={authLoading}
+                      className="w-full py-3 rounded-xl bg-[#446A5E] hover:bg-[#335047] text-white font-bold text-xs uppercase tracking-wider transition-all cursor-pointer"
+                    >
+                      {authLoading ? 'İşlem yapılıyor...' : (isLoginView ? 'Giriş Yap' : 'Kayıt Ol ve Başla')}
+                    </button>
+                  </form>
+
+                  <div className="text-center pt-4 border-t border-[#E8DFD8]">
+                    <button
+                      onClick={() => { setIsLoginView(!isLoginView); setAuthError(''); }}
+                      className="text-xs text-[#446A5E] font-bold underline cursor-pointer"
+                    >
+                      {isLoginView ? 'Hesabınız yok mu? Hemen Kayıt Olun' : 'Zaten hesabınız var mı? Giriş Yapın'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* 2. DANIŞAN GİRİŞİ YAPILDIYSA */}
+              {currentUser && !isAdmin && (
+                <div className="space-y-4">
+                  <div className="flex bg-[#FAF7F2] p-1 rounded-xl border border-[#E8DFD8]">
+                    <button
+                      onClick={() => setClientTab('appointments')}
+                      className={`flex-1 py-2 font-bold rounded-lg transition-all ${clientTab === 'appointments' ? 'bg-[#446A5E] text-white' : 'text-stone-600'}`}
+                    >
+                      Randevularım ({myAppointments.length})
+                    </button>
+                    <button
+                      onClick={() => setClientTab('messages')}
+                      className={`flex-1 py-2 font-bold rounded-lg transition-all ${clientTab === 'messages' ? 'bg-[#446A5E] text-white' : 'text-stone-600'}`}
+                    >
+                      İdari Not / Mesaj
+                    </button>
+                  </div>
+
+                  {clientTab === 'appointments' && (
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="font-bold text-[#192923]">Seans Geçmişi & Plan</span>
+                        <button
+                          onClick={() => setShowBooking(!showBooking)}
+                          className="px-3 py-1.5 rounded-lg bg-[#446A5E] text-white text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                        >
+                          <PlusCircle className="w-3.5 h-3.5" /> {showBooking ? 'Kapat' : 'Yeni Randevu'}
+                        </button>
+                      </div>
+
+                      {showBooking && (
+                        <form onSubmit={handleClientBook} className="p-3.5 bg-[#FAF7F2] rounded-2xl border border-[#E8DFD8] space-y-2">
+                          <p className="font-bold text-[#192923] text-[11px]">Tarih ve Saat Seçin</p>
+                          {bookingStatus === 'success' && <p className="text-emerald-700 font-bold text-[10px]">Talebiniz iletildi!</p>}
+                          <div className="grid grid-cols-2 gap-2">
+                            <input type="date" required value={bookingData.date} onChange={(e) => setBookingData({ ...bookingData, date: e.target.value })} className="p-2 bg-white rounded-lg border text-xs" />
+                            <select value={bookingData.time} onChange={(e) => setBookingData({ ...bookingData, time: e.target.value })} className="p-2 bg-white rounded-lg border text-xs">
+                              {['09:00', '10:00', '11:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00'].map(t => <option key={t} value={t}>{t}</option>)}
+                            </select>
+                          </div>
+                          <select value={bookingData.service} onChange={(e) => setBookingData({ ...bookingData, service: e.target.value })} className="w-full p-2 bg-white rounded-lg border text-xs">
+                            <option value="Yüz Yüze Görüşme (Alsancak / İzmir)">Yüz Yüze Görüşme (Alsancak / İzmir)</option>
+                            <option value="Online Görüşme">Online Görüşme</option>
+                          </select>
+                          <button type="submit" disabled={bookingStatus === 'loading'} className="w-full py-2 bg-[#446A5E] text-white font-bold rounded-lg text-xs cursor-pointer">
+                            {bookingStatus === 'loading' ? 'İletiliyor...' : 'Randevu İste'}
+                          </button>
+                        </form>
+                      )}
+
+                      {myAppointments.length === 0 ? (
+                        <p className="text-center text-stone-400 py-6">Kayıtlı randevunuz bulunmuyor.</p>
+                      ) : (
+                        myAppointments.map(appt => (
+                          <div key={appt.id} className="p-3 bg-[#FAF7F2] rounded-xl border border-[#E8DFD8] flex justify-between items-center">
+                            <div>
+                              <p className="font-bold text-[#192923]">{appt.appointment_date} &bull; {appt.appointment_time}</p>
+                              <p className="text-[10px] text-stone-500">{appt.service_type}</p>
+                            </div>
+                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                              appt.status === 'confirmed' ? 'bg-emerald-100 text-emerald-800' :
+                              appt.status === 'pending' ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800'
+                            }`}>
+                              {appt.status === 'confirmed' ? 'Onaylandı' : appt.status === 'pending' ? 'Onay Bekliyor' : 'İptal'}
+                            </span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+
+                  {clientTab === 'messages' && (
+                    <div className="flex flex-col h-[450px]">
+                      <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                        {myMessages.length === 0 ? (
+                          <p className="text-center text-stone-400 pt-8">Henüz mesaj iletilmedi.</p>
+                        ) : (
+                          myMessages.map(m => {
+                            const isMe = m.sender_id === currentUser.id;
+                            return (
+                              <div key={m.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                                <span className="text-[9px] text-stone-400 mb-0.5">{isMe ? 'Siz' : m.sender_name}</span>
+                                <div className={`p-2.5 rounded-xl max-w-[85%] ${isMe ? 'bg-[#446A5E] text-white rounded-br-none' : 'bg-[#FAF7F2] border text-stone-800 rounded-bl-none'}`}>
+                                  {m.message}
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                      <form onSubmit={handleClientSendMsg} className="pt-2 border-t border-[#E8DFD8] flex gap-2">
+                        <input type="text" required value={clientNewMsg} onChange={(e) => setClientNewMsg(e.target.value)} placeholder="İdari bir not yazın..." className="flex-1 px-3 py-2 bg-[#FAF7F2] rounded-xl border text-xs" />
+                        <button type="submit" className="p-2 bg-[#446A5E] text-white rounded-xl cursor-pointer"><Send className="w-3.5 h-3.5" /></button>
+                      </form>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 3. YÖNETİCİ (MELİKE ERMUMCU) GİRİŞİ YAPILDIYSA */}
+              {currentUser && isAdmin && (
+                <div className="space-y-4">
+                  <div className="flex bg-[#FAF7F2] p-1 rounded-xl border border-[#E8DFD8]">
+                    <button
+                      onClick={() => setAdminTab('appointments')}
+                      className={`flex-1 py-2 font-bold rounded-lg text-[11px] transition-all ${adminTab === 'appointments' ? 'bg-[#446A5E] text-white' : 'text-stone-600'}`}
+                    >
+                      Randevular ({adminAppointments.filter(a => a.status === 'pending').length})
+                    </button>
+                    <button
+                      onClick={() => setAdminTab('messages')}
+                      className={`flex-1 py-2 font-bold rounded-lg text-[11px] transition-all ${adminTab === 'messages' ? 'bg-[#446A5E] text-white' : 'text-stone-600'}`}
+                    >
+                      Mesajlar
+                    </button>
+                    <button
+                      onClick={() => setAdminTab('posts')}
+                      className={`flex-1 py-2 font-bold rounded-lg text-[11px] transition-all ${adminTab === 'posts' ? 'bg-[#446A5E] text-white' : 'text-stone-600'}`}
+                    >
+                      Yazı Ekle
+                    </button>
+                  </div>
+
+                  {adminTab === 'appointments' && (
+                    <div className="space-y-3">
+                      <p className="font-bold text-[#192923]">Danışan Randevu Talepleri</p>
+                      {adminAppointments.length === 0 ? (
+                        <p className="text-center text-stone-400 py-6">Kayıtlı randevu bulunmuyor.</p>
+                      ) : (
+                        adminAppointments.map(appt => (
+                          <div key={appt.id} className="p-3.5 bg-[#FAF7F2] rounded-2xl border border-[#E8DFD8] space-y-2">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <p className="font-bold text-[#192923] text-sm">{appt.client_name}</p>
+                                <p className="text-[11px] text-[#446A5E]">{appt.client_phone || 'Tel yok'}</p>
+                              </div>
+                              <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                                appt.status === 'confirmed' ? 'bg-emerald-100 text-emerald-800' :
+                                appt.status === 'pending' ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800'
+                              }`}>
+                                {appt.status === 'confirmed' ? 'Onaylı' : appt.status === 'pending' ? 'Bekliyor' : 'İptal'}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-stone-600">{appt.appointment_date} &bull; <strong>{appt.appointment_time}</strong> &bull; {appt.service_type}</p>
+                            {appt.note && <p className="text-[11px] text-stone-500 italic bg-white p-2 rounded-lg border">&quot;{appt.note}&quot;</p>}
+                            <div className="flex gap-2 pt-1">
+                              {appt.status !== 'confirmed' && (
+                                <button onClick={() => handleUpdateApptStatus(appt.id, 'confirmed')} className="flex-1 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] flex items-center justify-center gap-1 cursor-pointer">
+                                  <Check className="w-3 h-3" /> Onayla
+                                </button>
+                              )}
+                              {appt.status !== 'cancelled' && (
+                                <button onClick={() => handleUpdateApptStatus(appt.id, 'cancelled')} className="flex-1 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-bold text-[10px] flex items-center justify-center gap-1 cursor-pointer">
+                                  <X className="w-3 h-3" /> İptal
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+
+                  {adminTab === 'messages' && (
+                    <div className="flex flex-col h-[450px]">
+                      <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                        {adminMessages.length === 0 ? (
+                          <p className="text-center text-stone-400 pt-8">Henüz mesaj yok.</p>
+                        ) : (
+                          adminMessages.map(m => {
+                            const isMe = m.sender_role === 'admin';
+                            return (
+                              <div key={m.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                                <span className="text-[9px] text-stone-400 mb-0.5">{isMe ? 'Siz' : m.sender_name}</span>
+                                <div className={`p-2.5 rounded-xl max-w-[85%] ${isMe ? 'bg-[#446A5E] text-white rounded-br-none' : 'bg-[#FAF7F2] border text-stone-800 rounded-bl-none'}`}>
+                                  {m.message}
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                      <form onSubmit={handleSendAdminReply} className="pt-2 border-t border-[#E8DFD8] flex gap-2">
+                        <input type="text" required value={adminReply} onChange={(e) => setAdminReply(e.target.value)} placeholder="Danışana yanıt iletin..." className="flex-1 px-3 py-2 bg-[#FAF7F2] rounded-xl border text-xs" />
+                        <button type="submit" className="p-2 bg-[#446A5E] text-white rounded-xl cursor-pointer"><Send className="w-3.5 h-3.5" /></button>
+                      </form>
+                    </div>
+                  )}
+
+                  {adminTab === 'posts' && (
+                    <div className="space-y-3">
+                      <p className="font-bold text-[#192923]">Yeni Blog Yazısı Ekle</p>
+                      {blogStatus === 'success' && <p className="text-emerald-700 font-bold text-[10px]">Yazı yayınlandı!</p>}
+                      <form onSubmit={handleSavePost} className="space-y-2">
+                        <input type="text" required value={blogForm.title} onChange={(e) => setBlogForm({ ...blogForm, title: e.target.value, slug: generateSlug(e.target.value) })} placeholder="Başlık" className="w-full p-2 bg-[#FAF7F2] rounded-lg border text-xs" />
+                        <select value={blogForm.category} onChange={(e) => setBlogForm({ ...blogForm, category: e.target.value })} className="w-full p-2 bg-[#FAF7F2] rounded-lg border text-xs">
+                          <option value="Yetişkin Terapisi">Yetişkin Terapisi</option>
+                          <option value="Çocuk & Oyun">Çocuk & Oyun</option>
+                          <option value="Klinik Değerlendirme">Klinik Değerlendirme</option>
+                        </select>
+                        <textarea rows={2} required value={blogForm.excerpt} onChange={(e) => setBlogForm({ ...blogForm, excerpt: e.target.value })} placeholder="Kısa Özet" className="w-full p-2 bg-[#FAF7F2] rounded-lg border text-xs" />
+                        <textarea rows={4} required value={blogForm.content} onChange={(e) => setBlogForm({ ...blogForm, content: e.target.value })} placeholder="İçerik..." className="w-full p-2 bg-[#FAF7F2] rounded-lg border text-xs" />
+                        <button type="submit" disabled={blogStatus === 'loading'} className="w-full py-2 bg-[#446A5E] text-white font-bold rounded-lg text-xs cursor-pointer">
+                          {blogStatus === 'loading' ? 'Kaydediliyor...' : 'Yayınla'}
+                        </button>
+                      </form>
+                    </div>
+                  )}
+                </div>
+              )}
+
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
