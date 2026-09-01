@@ -209,14 +209,20 @@ export default function Home() {
             <a href="#sss" className="hover:text-[#446A5E] transition-colors">Sıkça Sorulanlar</a>
           </nav>
 
-          <div className="hidden md:flex items-center gap-4">
-            <a
-              href="#randevu"
-              className="px-5 py-2.5 rounded-full bg-[#446A5E] hover:bg-[#335047] text-white text-xs font-semibold tracking-wide shadow-sm hover:shadow transition-all duration-200"
-            >
-              Randevu Oluştur
-            </a>
-          </div>
+        <div className="hidden md:flex items-center gap-3">
+  <Link
+    href="/giris"
+    className="px-4 py-2.5 rounded-full bg-[#FAF7F2] hover:bg-[#E5ECE9] text-[#446A5E] border border-[#446A5E]/30 text-xs font-semibold tracking-wide transition-all duration-200"
+  >
+    Danışan Girişi
+  </Link>
+  <a
+    href="#randevu"
+    className="px-5 py-2.5 rounded-full bg-[#446A5E] hover:bg-[#335047] text-white text-xs font-semibold tracking-wide shadow-sm hover:shadow transition-all duration-200"
+  >
+    Randevu Oluştur
+  </a>
+</div>
 
           {/* Mobil Menü Butonu */}
           <button
@@ -747,12 +753,15 @@ export default function Home() {
             <p className="text-xs text-[#FAF7F2]/60 mt-1">Alsancak, İzmir & Online Danışmanlık &bull; &copy; 2026 Tüm Hakları Saklıdır.</p>
           </div>
           <div className="flex gap-6 text-xs text-[#FAF7F2]/70 font-medium">
-            <a href="#hakkimda" className="hover:text-white transition-colors">Hakkımda</a>
-            <a href="#uzmanliklar" className="hover:text-white transition-colors">Hizmetler</a>
-            <a href="#testler" className="hover:text-white transition-colors">Testler</a>
-            <a href="#blog" className="hover:text-white transition-colors">Yazılar</a>
-            <a href="#randevu" className="hover:text-white transition-colors">İletişim</a>
-            <Link href="/admin" className="hover:text-white transition-colors text-[#D6AFA3]">Panel Girişi</Link>
+<div className="flex gap-6 text-xs text-[#FAF7F2]/70 font-medium">
+  <a href="#hakkimda" className="hover:text-white transition-colors">Hakkımda</a>
+  <a href="#uzmanliklar" className="hover:text-white transition-colors">Hizmetler</a>
+  <a href="#testler" className="hover:text-white transition-colors">Testler</a>
+  <a href="#blog" className="hover:text-white transition-colors">Yazılar</a>
+  <a href="#randevu" className="hover:text-white transition-colors">İletişim</a>
+  <Link href="/giris" className="hover:text-white transition-colors text-[#D6AFA3]">Danışan Girişi</Link>
+  <Link href="/admin" className="hover:text-white transition-colors text-stone-500">Panel</Link>
+</div>
           </div>
         </div>
       </footer>
