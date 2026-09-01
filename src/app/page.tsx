@@ -29,7 +29,8 @@ import {
   Lock,
   PlusCircle,
   AlertCircle,
-  Sliders
+  Sliders,
+  KeyRound
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -41,9 +42,10 @@ export default function Home() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [isLoginView, setIsLoginView] = useState(true);
+  const [authView, setAuthView] = useState<'login' | 'register' | 'forgot'>('login');
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState('');
+  const [resetSent, setResetSent] = useState(false);
 
   // Form State (Auth)
   const [authForm, setAuthForm] = useState({
@@ -141,19 +143,16 @@ export default function Home() {
   }
 
   async function loadUserData(user: any) {
-    // Profil
     const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).single();
     if (prof) setProfile(prof);
 
     if (user.email === 'melikeermumcu0@gmail.com') {
-      // Yönetici Verileri
       const { data: appts } = await supabase.from('appointments').select('*').order('appointment_date', { ascending: true });
       if (appts) setAdminAppointments(appts);
 
       const { data: msgs } = await supabase.from('portal_messages').select('*').order('created_at', { ascending: true });
       if (msgs) setAdminMessages(msgs);
     } else {
-      // Danışan Verileri
       const { data: appts } = await supabase.from('appointments').select('*').eq('client_id', user.id).order('appointment_date', { ascending: true });
       if (appts) setMyAppointments(appts);
 
@@ -176,9 +175,10 @@ export default function Home() {
     e.preventDefault();
     setAuthLoading(true);
     setAuthError('');
+    setResetSent(false);
 
     try {
-      if (isLoginView) {
+      if (authView === 'login') {
         const { data, error } = await supabase.auth.signInWithPassword({
           email: authForm.email,
           password: authForm.password
@@ -189,7 +189,7 @@ export default function Home() {
           loadUserData(data.user);
           setAuthForm({ fullName: '', phone: '', email: '', password: '' });
         }
-      } else {
+      } else if (authView === 'register') {
         const { data, error } = await supabase.auth.signUp({
           email: authForm.email,
           password: authForm.password,
@@ -211,12 +211,19 @@ export default function Home() {
           loadUserData(data.user);
           setAuthForm({ fullName: '', phone: '', email: '', password: '' });
         }
+      } else if (authView === 'forgot') {
+        const redirectUrl = typeof window !== 'undefined' ? `${window.location.origin}/sifre-yenile` : 'https://melike-psikoloji-rhjm.vercel.app/sifre-yenile';
+        const { error } = await supabase.auth.resetPasswordForEmail(authForm.email, {
+          redirectTo: redirectUrl
+        });
+        if (error) throw error;
+        setResetSent(true);
       }
     } catch (err: unknown) {
       if (err instanceof Error) {
         setAuthError(err.message === 'Invalid login credentials' ? 'E-posta adresi veya şifre hatalı.' : err.message);
       } else {
-        setAuthError('Giriş yapılırken bir hata oluştu.');
+        setAuthError('İşlem yapılırken bir hata oluştu.');
       }
     } finally {
       setAuthLoading(false);
@@ -230,7 +237,7 @@ export default function Home() {
     setDrawerOpen(false);
   };
 
-  // Danışan Randevu Talebi (Güçlendirilmiş & Hata Yakalayan)
+  // Danışan Randevu Talebi
   const handleClientBook = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser) return;
@@ -254,7 +261,6 @@ export default function Home() {
       ]).select();
 
       if (error) {
-        console.error('Randevu hatası:', error.message);
         alert('Randevu oluşturulamadı: ' + error.message);
         setBookingStatus('idle');
         return;
@@ -479,7 +485,7 @@ export default function Home() {
               </button>
             ) : (
               <button
-                onClick={() => { setIsLoginView(true); setDrawerOpen(true); }}
+                onClick={() => { setAuthView('login'); setDrawerOpen(true); }}
                 className="px-4 py-2.5 rounded-full bg-[#FAF7F2] hover:bg-[#E5ECE9] text-[#446A5E] border border-[#446A5E]/30 text-xs font-semibold tracking-wide transition-all cursor-pointer"
               >
                 Giriş Yap / Kayıt
@@ -511,7 +517,7 @@ export default function Home() {
             <a href="#blog" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-sm font-medium text-[#192923]">Yazılar</a>
             <a href="#sss" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-sm font-medium text-[#192923]">Sıkça Sorulanlar</a>
             <button
-              onClick={() => { setMobileMenuOpen(false); setDrawerOpen(true); }}
+              onClick={() => { setMobileMenuOpen(false); setAuthView('login'); setDrawerOpen(true); }}
               className="block w-full text-center py-2.5 rounded-full bg-[#446A5E] text-white text-xs font-bold cursor-pointer"
             >
               {currentUser ? (isAdmin ? 'Yönetici Paneli' : 'Hesabım') : 'Giriş Yap / Kayıt Ol'}
@@ -931,7 +937,7 @@ export default function Home() {
                   <h3 className="text-sm font-extrabold">
                     {currentUser 
                       ? (isAdmin ? 'Psikolog Yönetici Paneli' : (profile?.full_name || currentUser.user_metadata?.full_name || 'Danışan Hesabı'))
-                      : (isLoginView ? 'Danışan Girişi' : 'Yeni Kayıt')}
+                      : (authView === 'login' ? 'Danışan Girişi' : authView === 'register' ? 'Yeni Danışan Kaydı' : 'Şifremi Unuttum')}
                   </h3>
                   {currentUser && <p className="text-[10px] text-[#FAF7F2]/60">{currentUser.email}</p>}
                 </div>
@@ -952,7 +958,7 @@ export default function Home() {
             {/* Çekmece İçeriği */}
             <div className="flex-1 overflow-y-auto p-5 text-xs">
               
-              {/* 1. GİRİŞ YAPILMAMIŞSA */}
+              {/* 1. GİRİŞ YAPILMAMIŞSA (AUTH FORMLARI) */}
               {!currentUser && (
                 <div className="space-y-4 pt-4">
                   {authError && (
@@ -962,8 +968,15 @@ export default function Home() {
                     </div>
                   )}
 
+                  {resetSent && (
+                    <div className="p-4 rounded-2xl bg-[#E5ECE9] border border-[#446A5E]/40 text-[#446A5E] text-xs space-y-1">
+                      <p className="font-bold">Sıfırlama bağlantısı gönderildi!</p>
+                      <p className="text-stone-600">Lütfen e-posta kutunuzu kontrol edip gelen linke tıklayın.</p>
+                    </div>
+                  )}
+
                   <form onSubmit={handleAuth} className="space-y-3">
-                    {!isLoginView && (
+                    {authView === 'register' && (
                       <>
                         <div>
                           <label className="block text-xs font-bold text-[#192923] mb-1">Ad Soyad</label>
@@ -991,7 +1004,7 @@ export default function Home() {
                     )}
 
                     <div>
-                      <label className="block text-xs font-bold text-[#192923] mb-1">E-Posta</label>
+                      <label className="block text-xs font-bold text-[#192923] mb-1">E-Posta Adresi</label>
                       <input
                         type="email"
                         required
@@ -1002,40 +1015,74 @@ export default function Home() {
                       />
                     </div>
 
-                    <div>
-                      <label className="block text-xs font-bold text-[#192923] mb-1">Şifre</label>
-                      <input
-                        type="password"
-                        required
-                        minLength={6}
-                        value={authForm.password}
-                        onChange={(e) => setAuthForm({ ...authForm, password: e.target.value })}
-                        placeholder="En az 6 karakter"
-                        className="w-full px-3 py-2 rounded-xl border border-[#E8DFD8] bg-[#FAF7F2] text-xs"
-                      />
-                    </div>
+                    {authView !== 'forgot' && (
+                      <div>
+                        <div className="flex justify-between items-center mb-1">
+                          <label className="block text-xs font-bold text-[#192923]">Şifre</label>
+                          {authView === 'login' && (
+                            <button
+                              type="button"
+                              onClick={() => { setAuthView('forgot'); setAuthError(''); setResetSent(false); }}
+                              className="text-[11px] text-[#446A5E] font-medium hover:underline cursor-pointer"
+                            >
+                              Şifremi Unuttum
+                            </button>
+                          )}
+                        </div>
+                        <input
+                          type="password"
+                          required
+                          minLength={6}
+                          value={authForm.password}
+                          onChange={(e) => setAuthForm({ ...authForm, password: e.target.value })}
+                          placeholder="En az 6 karakter"
+                          className="w-full px-3 py-2 rounded-xl border border-[#E8DFD8] bg-[#FAF7F2] text-xs"
+                        />
+                      </div>
+                    )}
 
                     <button
                       type="submit"
                       disabled={authLoading}
-                      className="w-full py-3 rounded-xl bg-[#446A5E] hover:bg-[#335047] text-white font-bold text-xs uppercase tracking-wider transition-all cursor-pointer"
+                      className="w-full py-3 rounded-xl bg-[#446A5E] hover:bg-[#335047] text-white font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
                     >
-                      {authLoading ? 'İşlem yapılıyor...' : (isLoginView ? 'Giriş Yap' : 'Kayıt Ol ve Başla')}
+                      {authLoading ? 'İşlem yapılıyor...' : (
+                        authView === 'login' ? 'Giriş Yap' :
+                        authView === 'register' ? 'Kayıt Ol ve Başla' : 'Sıfırlama Linki Gönder'
+                      )}
                     </button>
                   </form>
 
-                  <div className="text-center pt-4 border-t border-[#E8DFD8]">
-                    <button
-                      onClick={() => { setIsLoginView(!isLoginView); setAuthError(''); }}
-                      className="text-xs text-[#446A5E] font-bold underline cursor-pointer"
-                    >
-                      {isLoginView ? 'Hesabınız yok mu? Hemen Kayıt Olun' : 'Zaten hesabınız var mı? Giriş Yapın'}
-                    </button>
+                  <div className="text-center pt-4 border-t border-[#E8DFD8] space-y-2">
+                    {authView === 'login' && (
+                      <button
+                        onClick={() => { setAuthView('register'); setAuthError(''); }}
+                        className="text-xs text-[#446A5E] font-bold underline cursor-pointer"
+                      >
+                        Hesabınız yok mu? Hemen Kayıt Olun
+                      </button>
+                    )}
+                    {authView === 'register' && (
+                      <button
+                        onClick={() => { setAuthView('login'); setAuthError(''); }}
+                        className="text-xs text-[#446A5E] font-bold underline cursor-pointer"
+                      >
+                        Zaten hesabınız var mı? Giriş Yapın
+                      </button>
+                    )}
+                    {authView === 'forgot' && (
+                      <button
+                        onClick={() => { setAuthView('login'); setAuthError(''); setResetSent(false); }}
+                        className="text-xs text-[#446A5E] font-bold underline cursor-pointer"
+                      >
+                        Giriş Ekranına Geri Dön
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
 
-              {/* 2. DANIŞAN GİRİŞİ */}
+              {/* 2. DANIŞAN GİRİŞİ YAPILDIYSA */}
               {currentUser && !isAdmin && (
                 <div className="space-y-4">
                   <div className="flex bg-[#FAF7F2] p-1 rounded-xl border border-[#E8DFD8]">
@@ -1134,7 +1181,7 @@ export default function Home() {
                 </div>
               )}
 
-              {/* 3. YÖNETİCİ GİRİŞİ */}
+              {/* 3. YÖNETİCİ (MELİKE ERMUMCU) GİRİŞİ */}
               {currentUser && isAdmin && (
                 <div className="space-y-4">
                   <div className="flex bg-[#FAF7F2] p-1 rounded-xl border border-[#E8DFD8]">
