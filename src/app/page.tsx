@@ -230,36 +230,57 @@ export default function Home() {
     setDrawerOpen(false);
   };
 
-  // Danışan İşlemleri
+  // Danışan Randevu Talebi (Güçlendirilmiş & Hata Yakalayan)
   const handleClientBook = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!currentUser) return;
     setBookingStatus('loading');
-    const senderName = profile?.full_name || currentUser.user_metadata?.full_name || currentUser.email;
-    const senderPhone = profile?.phone || currentUser.user_metadata?.phone || '';
 
-    const { data, error } = await supabase.from('appointments').insert([
-      {
-        client_id: currentUser.id,
-        client_name: senderName,
-        client_phone: senderPhone,
-        appointment_date: bookingData.date,
-        appointment_time: bookingData.time,
-        service_type: bookingData.service,
-        status: 'pending',
-        note: bookingData.note
-      }
-    ]).select();
+    try {
+      const senderName = profile?.full_name || currentUser.user_metadata?.full_name || currentUser.email || 'Danışan';
+      const senderPhone = profile?.phone || currentUser.user_metadata?.phone || '';
 
-    if (!error && data) {
-      setMyAppointments([...myAppointments, data[0]]);
-      setBookingStatus('success');
-      setTimeout(() => {
-        setShowBooking(false);
+      const { data, error } = await supabase.from('appointments').insert([
+        {
+          client_id: currentUser.id,
+          client_name: senderName,
+          client_phone: senderPhone,
+          appointment_date: bookingData.date,
+          appointment_time: bookingData.time,
+          service_type: bookingData.service,
+          status: 'pending',
+          note: bookingData.note
+        }
+      ]).select();
+
+      if (error) {
+        console.error('Randevu hatası:', error.message);
+        alert('Randevu oluşturulamadı: ' + error.message);
         setBookingStatus('idle');
-      }, 1500);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        setMyAppointments((prev) => [...prev, data[0]]);
+        setBookingStatus('success');
+        setBookingData({
+          date: '',
+          time: '10:00',
+          service: 'Yüz Yüze Görüşme (Alsancak / İzmir)',
+          note: ''
+        });
+        setTimeout(() => {
+          setShowBooking(false);
+          setBookingStatus('idle');
+        }, 1200);
+      }
+    } catch (err) {
+      console.error(err);
+      setBookingStatus('idle');
     }
   };
 
+  // Danışan Mesaj Gönderme
   const handleClientSendMsg = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!clientNewMsg.trim() || !currentUser) return;
@@ -442,7 +463,7 @@ export default function Home() {
             <a href="#sss" className="hover:text-[#446A5E] transition-colors">Sıkça Sorulanlar</a>
           </nav>
 
-          {/* Sağ Butonlar (Trendyol Tarzı) */}
+          {/* Sağ Butonlar */}
           <div className="hidden md:flex items-center gap-3">
             {currentUser ? (
               <button
@@ -729,7 +750,7 @@ export default function Home() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center space-y-3 mb-12">
             <span className="text-xs font-bold text-[#446A5E] uppercase tracking-widest">Merak Edilenler</span>
-            <h2 className="text-3xl font-extrabold text-[#192923]">Sıkça Sorulan Sorular</h2>
+            <h2 className="text-3xl font-extrabold text-[#192923]">Sıkça Sorulanlar</h2>
           </div>
           <div className="space-y-4">
             {faqs.map((faq, idx) => (
@@ -931,7 +952,7 @@ export default function Home() {
             {/* Çekmece İçeriği */}
             <div className="flex-1 overflow-y-auto p-5 text-xs">
               
-              {/* 1. GİRİŞ YAPILMAMIŞSA (AUTH FORMU) */}
+              {/* 1. GİRİŞ YAPILMAMIŞSA */}
               {!currentUser && (
                 <div className="space-y-4 pt-4">
                   {authError && (
@@ -1014,7 +1035,7 @@ export default function Home() {
                 </div>
               )}
 
-              {/* 2. DANIŞAN GİRİŞİ YAPILDIYSA */}
+              {/* 2. DANIŞAN GİRİŞİ */}
               {currentUser && !isAdmin && (
                 <div className="space-y-4">
                   <div className="flex bg-[#FAF7F2] p-1 rounded-xl border border-[#E8DFD8]">
@@ -1113,7 +1134,7 @@ export default function Home() {
                 </div>
               )}
 
-              {/* 3. YÖNETİCİ (MELİKE ERMUMCU) GİRİŞİ YAPILDIYSA */}
+              {/* 3. YÖNETİCİ GİRİŞİ */}
               {currentUser && isAdmin && (
                 <div className="space-y-4">
                   <div className="flex bg-[#FAF7F2] p-1 rounded-xl border border-[#E8DFD8]">
