@@ -1,301 +1,425 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
-import { Lock, PlusCircle, Trash2, CheckCircle2, AlertCircle, ArrowLeft, Loader2 } from 'lucide-react';
 import Link from 'next/link';
+import { supabase } from '../../lib/supabase';
+import { 
+  ArrowLeft, 
+  Plus, 
+  Trash2, 
+  Clock, 
+  Calendar, 
+  Send, 
+  CheckCircle2, 
+  AlertCircle,
+  MessageSquare,
+  Users,
+  Check,
+  X
+} from 'lucide-react';
 
-interface PostItem {
-  id: string;
-  title: string;
-  category: string;
-  excerpt: string;
-  content: string;
-  read_time?: string;
-}
+export default function AdminDashboard() {
+  const [activeTab, setActiveTab] = useState<'posts' | 'appointments' | 'messages'>('appointments');
+  
+  // Blog State
+  const [posts, setPosts] = useState<any[]>([]);
+  const [blogForm, setBlogForm] = useState({
+    title: '',
+    slug: '',
+    category: 'Yetişkin Terapisi',
+    excerpt: '',
+    content: '',
+    read_time: '4 dk okuma'
+  });
+  const [blogStatus, setBlogStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
 
-export default function AdminPage() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [emailInput, setEmailInput] = useState('');
-  const [passwordInput, setPasswordInput] = useState('');
-  const [authError, setAuthError] = useState('');
+  // Randevular & Mesajlar State
+  const [appointments, setAppointments] = useState<any[]>([]);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [adminReply, setAdminReply] = useState('');
 
-  const [posts, setPosts] = useState<PostItem[]>([]);
-  const [loadingPosts, setLoadingPosts] = useState(false);
+  const loadData = async () => {
+    // 1. Bloglar
+    const { data: p } = await supabase.from('posts').select('*').order('created_at', { ascending: false });
+    if (p) setPosts(p);
 
-  const [title, setTitle] = useState('');
-  const [category, setCategory] = useState('Yetişkin Terapisi');
-  const [excerpt, setExcerpt] = useState('');
-  const [content, setContent] = useState('');
-  const [readTime, setReadTime] = useState('4 dk okuma');
-  const [saving, setSaving] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
+    // 2. Randevular
+    const { data: a } = await supabase.from('appointments').select('*').order('appointment_date', { ascending: true });
+    if (a) setAppointments(a);
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (emailInput === 'melikeermumcu0@gmail.com' && passwordInput === 'Melike2026!') {
-      setIsAuthenticated(true);
-      setAuthError('');
-    } else {
-      setAuthError('Hatalı e-posta veya şifre girdiniz.');
-    }
-  };
-
-  const fetchPosts = async () => {
-    setLoadingPosts(true);
-    const { data } = await supabase
-      .from('posts')
-      .select('*')
-      .order('created_at', { ascending: false });
-    if (data) setPosts(data as PostItem[]);
-    setLoadingPosts(false);
+    // 3. Mesajlar
+    const { data: m } = await supabase.from('portal_messages').select('*').order('created_at', { ascending: true });
+    if (m) setMessages(m);
   };
 
   useEffect(() => {
-    if (isAuthenticated) {
-      fetchPosts();
-    }
-  }, [isAuthenticated]);
+    loadData();
+  }, []);
 
-  const handleCreatePost = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    setSaveSuccess(false);
-
-    const slug = title
+  // Slug Oluşturucu
+  const generateSlug = (text: string) => {
+    return text
       .toLowerCase()
+      .trim()
       .replace(/ğ/g, 'g')
       .replace(/ü/g, 'u')
       .replace(/ş/g, 's')
       .replace(/ı/g, 'i')
       .replace(/ö/g, 'o')
       .replace(/ç/g, 'c')
-      .replace(/[^a-z0-9]/g, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '') + '-' + Date.now().toString().slice(-4);
+      .replace(/[^a-z0-9 -]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-');
+  };
 
-    const { error } = await supabase.from('posts').insert([
-      {
-        title,
-        slug,
-        category,
-        excerpt,
-        content,
-        read_time: readTime,
-        published: true
-      }
-    ]);
+  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setBlogForm({
+      ...blogForm,
+      title: val,
+      slug: generateSlug(val)
+    });
+  };
 
-    setSaving(false);
+  // Blog Kaydet
+  const handleSavePost = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBlogStatus('loading');
 
-    if (!error) {
-      setSaveSuccess(true);
-      setTitle('');
-      setExcerpt('');
-      setContent('');
-      fetchPosts();
+    const { data, error } = await supabase.from('posts').insert([blogForm]).select();
+
+    if (!error && data) {
+      setPosts([data[0], ...posts]);
+      setBlogStatus('success');
+      setBlogForm({
+        title: '',
+        slug: '',
+        category: 'Yetişkin Terapisi',
+        excerpt: '',
+        content: '',
+        read_time: '4 dk okuma'
+      });
+      setTimeout(() => setBlogStatus('idle'), 2000);
     } else {
-      alert('Hata: ' + error.message);
+      setBlogStatus('error');
     }
   };
 
-  const handleDelete = async (id: string) => {
+  // Blog Sil
+  const handleDeletePost = async (id: string) => {
     if (!confirm('Bu yazıyı silmek istediğinizden emin misiniz?')) return;
-    await supabase.from('posts').delete().eq('id', id);
-    fetchPosts();
+    const { error } = await supabase.from('posts').delete().eq('id', id);
+    if (!error) {
+      setPosts(posts.filter((p) => p.id !== id));
+    }
   };
 
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-[#FAF7F2] flex items-center justify-center p-4 font-sans">
-        <div className="max-w-md w-full bg-white rounded-3xl p-8 border border-[#E8DFD8] shadow-xl">
-          <div className="w-12 h-12 rounded-2xl bg-[#E5ECE9] text-[#446A5E] flex items-center justify-center mx-auto mb-4">
-            <Lock className="w-6 h-6" />
-          </div>
-          <h2 className="text-xl font-bold text-center text-[#192923]">Blog Yönetim Paneli</h2>
-          <p className="text-xs text-center text-stone-500 mb-6 mt-1">Sadece yetkili kullanıcılar erişebilir.</p>
+  // Randevu Durumu Güncelle (Onayla / İptal Et)
+  const handleUpdateStatus = async (id: string, status: 'confirmed' | 'cancelled') => {
+    const { error } = await supabase.from('appointments').update({ status }).eq('id', id);
+    if (!error) {
+      setAppointments(appointments.map(a => a.id === id ? { ...a, status } : a));
+    }
+  };
 
-          {authError && (
-            <div className="p-3 mb-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{authError}</span>
-            </div>
-          )}
+  // Admin Mesaj Yanıtla
+  const handleSendAdminReply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adminReply.trim()) return;
 
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-[#192923] mb-1">E-Posta Adresi</label>
-              <input
-                type="email"
-                required
-                value={emailInput}
-                onChange={(e) => setEmailInput(e.target.value)}
-                placeholder="melikeermumcu0@gmail.com"
-                className="w-full px-4 py-3 rounded-xl border border-[#E8DFD8] text-sm focus:outline-none focus:border-[#446A5E]"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-[#192923] mb-1">Yönetici Şifresi</label>
-              <input
-                type="password"
-                required
-                value={passwordInput}
-                onChange={(e) => setPasswordInput(e.target.value)}
-                placeholder="••••••••"
-                className="w-full px-4 py-3 rounded-xl border border-[#E8DFD8] text-sm focus:outline-none focus:border-[#446A5E]"
-              />
-            </div>
-            <button
-              type="submit"
-              className="w-full py-3.5 bg-[#446A5E] text-white font-semibold rounded-xl text-sm hover:bg-[#335047] transition-all cursor-pointer"
-            >
-              Giriş Yap
-            </button>
-          </form>
-        </div>
-      </div>
-    );
-  }
+    const { data, error } = await supabase
+      .from('portal_messages')
+      .insert([
+        {
+          sender_id: null,
+          sender_name: 'Melike Ermumcu (Klinik Psikolog)',
+          sender_role: 'admin',
+          message: adminReply.trim()
+        }
+      ])
+      .select();
+
+    if (!error && data) {
+      setMessages([...messages, data[0]]);
+      setAdminReply('');
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-[#FAF7F2] text-[#192923] p-6 lg:p-12 font-sans">
-      <div className="max-w-5xl mx-auto space-y-8">
-        <div className="flex items-center justify-between pb-6 border-b border-[#E8DFD8]">
+    <div className="min-h-screen bg-[#FAF7F2] text-[#192923] font-sans selection:bg-[#D6AFA3]">
+      
+      {/* Üst Bar */}
+      <header className="bg-white border-b border-[#E8DFD8] sticky top-0 z-40">
+        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Link href="/" className="p-2 rounded-xl bg-white border border-[#E8DFD8] text-stone-600 hover:text-[#446A5E]">
-              <ArrowLeft className="w-5 h-5" />
+            <Link href="/" className="text-xs font-semibold text-[#446A5E] hover:text-[#335047] flex items-center gap-1">
+              <ArrowLeft className="w-3.5 h-3.5" /> Siteye Dön
             </Link>
-            <div>
-              <h1 className="text-2xl font-bold text-[#192923]">Blog Yönetim Paneli</h1>
-              <p className="text-xs text-stone-500">Klinik Psikolog Melike Ermumcu</p>
-            </div>
-          </div>
-          <button
-            onClick={() => setIsAuthenticated(false)}
-            className="text-xs px-4 py-2 rounded-xl bg-stone-200 hover:bg-stone-300 font-semibold transition-colors cursor-pointer"
-          >
-            Çıkış Yap
-          </button>
-        </div>
-
-        <div className="bg-white p-8 rounded-3xl border border-[#E8DFD8] shadow-sm space-y-6">
-          <div className="flex items-center gap-2 text-[#446A5E] font-bold text-lg">
-            <PlusCircle className="w-5 h-5" />
-            <span>Yeni Makale Yayınla</span>
+            <span className="opacity-30">|</span>
+            <h1 className="text-sm font-extrabold text-[#192923]">Psikolog Yönetici Paneli</h1>
           </div>
 
-          {saveSuccess && (
-            <div className="p-4 rounded-xl bg-[#E5ECE9] border border-[#446A5E]/40 text-[#446A5E] text-xs flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 shrink-0" />
-              <span>Makaleniz başarıyla yayınlandı ve web sitesine eklendi!</span>
-            </div>
-          )}
-
-          <form onSubmit={handleCreatePost} className="space-y-4">
-            <div className="grid sm:grid-cols-3 gap-4">
-              <div className="sm:col-span-2">
-                <label className="block text-xs font-bold mb-1">Makale Başlığı *</label>
-                <input
-                  type="text"
-                  required
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Örn: Sınav Kaygısı ile Başa Çıkma Yolları"
-                  className="w-full px-4 py-2.5 rounded-xl border border-[#E8DFD8] text-sm focus:outline-none focus:border-[#446A5E]"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold mb-1">Kategori *</label>
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-[#E8DFD8] text-sm focus:outline-none focus:border-[#446A5E]"
-                >
-                  <option value="Yetişkin Terapisi">Yetişkin Terapisi</option>
-                  <option value="Çocuk & Oyun Terapisi">Çocuk & Oyun Terapisi</option>
-                  <option value="Klinik Değerlendirme">Klinik Değerlendirme</option>
-                  <option value="Farkındalık & Ruh Sağlığı">Farkındalık & Ruh Sağlığı</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid sm:grid-cols-3 gap-4">
-              <div className="sm:col-span-2">
-                <label className="block text-xs font-bold mb-1">Kısa Özet *</label>
-                <input
-                  type="text"
-                  required
-                  value={excerpt}
-                  onChange={(e) => setExcerpt(e.target.value)}
-                  placeholder="Kart üzerinde görünecek 1-2 cümlelik kısa özet"
-                  className="w-full px-4 py-2.5 rounded-xl border border-[#E8DFD8] text-sm focus:outline-none focus:border-[#446A5E]"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold mb-1">Okuma Süresi</label>
-                <input
-                  type="text"
-                  value={readTime}
-                  onChange={(e) => setReadTime(e.target.value)}
-                  placeholder="4 dk okuma"
-                  className="w-full px-4 py-2.5 rounded-xl border border-[#E8DFD8] text-sm focus:outline-none focus:border-[#446A5E]"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold mb-1">Makale İçeriği *</label>
-              <textarea
-                rows={8}
-                required
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder="Makalenizin tam metnini buraya yazabilirsiniz..."
-                className="w-full px-4 py-3 rounded-xl border border-[#E8DFD8] text-sm focus:outline-none focus:border-[#446A5E] leading-relaxed"
-              />
-            </div>
-
+          {/* Sekmeler */}
+          <div className="flex gap-2">
             <button
-              type="submit"
-              disabled={saving}
-              className="px-6 py-3 bg-[#446A5E] text-white font-semibold text-xs rounded-xl hover:bg-[#335047] transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+              onClick={() => setActiveTab('appointments')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === 'appointments' ? 'bg-[#446A5E] text-white' : 'bg-[#FAF7F2] text-stone-600'
+              }`}
             >
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <PlusCircle className="w-4 h-4" />}
-              Makaleyi Sitede Yayınla
+              Randevular ({appointments.filter(a => a.status === 'pending').length})
             </button>
-          </form>
+            <button
+              onClick={() => setActiveTab('messages')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === 'messages' ? 'bg-[#446A5E] text-white' : 'bg-[#FAF7F2] text-stone-600'
+              }`}
+            >
+              İdari Notlar
+            </button>
+            <button
+              onClick={() => setActiveTab('posts')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === 'posts' ? 'bg-[#446A5E] text-white' : 'bg-[#FAF7F2] text-stone-600'
+              }`}
+            >
+              Blog Yazıları
+            </button>
+          </div>
         </div>
+      </header>
 
-        <div className="bg-white p-8 rounded-3xl border border-[#E8DFD8] shadow-sm space-y-4">
-          <h2 className="font-bold text-lg text-[#192923]">Yayındaki Makaleler ({posts.length})</h2>
+      <main className="max-w-6xl mx-auto px-4 py-8">
+        
+        {/* 1. SEKME: RANDEVULAR */}
+        {activeTab === 'appointments' && (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h2 className="text-xl font-extrabold text-[#192923]">Danışan Randevu Talepleri</h2>
+                <p className="text-xs text-stone-500">Portaldan ve siteden gelen tüm randevu kayıtları</p>
+              </div>
+            </div>
 
-          {loadingPosts ? (
-            <p className="text-xs text-stone-500">Yükleniyor...</p>
-          ) : posts.length === 0 ? (
-            <p className="text-xs text-stone-500">Henüz eklenmiş bir yazı yok. Yukarıdan ilk yazınızı ekleyebilirsiniz.</p>
-          ) : (
-            <div className="divide-y divide-[#E8DFD8]">
-              {posts.map((post) => (
-                <div key={post.id} className="py-4 flex items-center justify-between gap-4">
+            {appointments.length === 0 ? (
+              <div className="bg-white p-8 rounded-3xl border border-[#E8DFD8] text-center text-xs text-stone-500">
+                Henüz kayıtlı bir randevu bulunmamaktadır.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {appointments.map((appt) => (
+                  <div
+                    key={appt.id}
+                    className="bg-white p-5 rounded-2xl border border-[#E8DFD8] shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-3">
+                        <span className="font-extrabold text-sm text-[#192923]">{appt.client_name}</span>
+                        <span className="text-xs text-stone-500">({appt.client_phone || 'Tel yok'})</span>
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                          appt.status === 'confirmed' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                          appt.status === 'pending' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+                          'bg-red-50 text-red-700 border border-red-200'
+                        }`}>
+                          {appt.status === 'confirmed' ? 'Onaylandı' : appt.status === 'pending' ? 'Onay Bekliyor' : 'İptal'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-stone-600">
+                        {appt.appointment_date} &bull; <strong className="text-[#446A5E]">{appt.appointment_time}</strong> &bull; {appt.service_type}
+                      </p>
+                      {appt.note && <p className="text-xs text-stone-500 italic bg-[#FAF7F2] p-2 rounded-lg mt-1">&quot;{appt.note}&quot;</p>}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {appt.status !== 'confirmed' && (
+                        <button
+                          onClick={() => handleUpdateStatus(appt.id, 'confirmed')}
+                          className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                        >
+                          <Check className="w-3.5 h-3.5" /> Onayla
+                        </button>
+                      )}
+                      {appt.status !== 'cancelled' && (
+                        <button
+                          onClick={() => handleUpdateStatus(appt.id, 'cancelled')}
+                          className="px-3 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                        >
+                          <X className="w-3.5 h-3.5" /> İptal Et
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 2. SEKME: İDARİ NOTLAR / MESAJLAR */}
+        {activeTab === 'messages' && (
+          <div className="bg-white p-6 rounded-3xl border border-[#E8DFD8] shadow-sm flex flex-col h-[600px]">
+            <div className="border-b border-[#E8DFD8] pb-4 mb-4">
+              <h2 className="text-base font-extrabold text-[#192923] flex items-center gap-2">
+                <MessageSquare className="w-4 h-4 text-[#446A5E]" /> Danışan İdari Notları
+              </h2>
+              <p className="text-xs text-stone-500">Danışanların portal üzerinden ilettiği notlar ve yanıtlarınız</p>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-3 pr-2 text-xs">
+              {messages.length === 0 ? (
+                <p className="text-center text-stone-400 pt-16">Henüz gelen bir idari not bulunmuyor.</p>
+              ) : (
+                messages.map((m) => {
+                  const isAdmin = m.sender_role === 'admin';
+                  return (
+                    <div
+                      key={m.id}
+                      className={`flex flex-col ${isAdmin ? 'items-end' : 'items-start'}`}
+                    >
+                      <span className="text-[10px] text-stone-400 mb-0.5 font-medium">
+                        {m.sender_name}
+                      </span>
+                      <div
+                        className={`p-3 rounded-2xl max-w-[80%] ${
+                          isAdmin
+                            ? 'bg-[#446A5E] text-white rounded-br-none'
+                            : 'bg-[#FAF7F2] border border-[#E8DFD8] text-stone-800 rounded-bl-none'
+                        }`}
+                      >
+                        {m.message}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            <form onSubmit={handleSendAdminReply} className="mt-4 pt-3 border-t border-[#E8DFD8] flex gap-2">
+              <input
+                type="text"
+                required
+                value={adminReply}
+                onChange={(e) => setAdminReply(e.target.value)}
+                placeholder="Danışanlara genel/idari bir yanıt yazın..."
+                className="flex-1 px-4 py-2.5 rounded-xl border border-[#E8DFD8] bg-[#FAF7F2] text-xs focus:outline-none focus:border-[#446A5E]"
+              />
+              <button
+                type="submit"
+                className="px-4 py-2.5 rounded-xl bg-[#446A5E] hover:bg-[#335047] text-white text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <Send className="w-3.5 h-3.5" /> Yanıtla
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* 3. SEKME: BLOG YÖNETİMİ */}
+        {activeTab === 'posts' && (
+          <div className="grid lg:grid-cols-12 gap-8">
+            <div className="lg:col-span-6 bg-white p-6 rounded-3xl border border-[#E8DFD8] shadow-sm space-y-4">
+              <h2 className="text-base font-extrabold text-[#192923]">Yeni Blog Yazısı Ekle</h2>
+
+              {blogStatus === 'success' && (
+                <div className="p-3 rounded-xl bg-[#E5ECE9] text-[#446A5E] text-xs font-semibold flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4" /> Yazı başarıyla yayınlandı!
+                </div>
+              )}
+
+              <form onSubmit={handleSavePost} className="space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-[#192923] mb-1">Makale Başlığı</label>
+                  <input
+                    type="text"
+                    required
+                    value={blogForm.title}
+                    onChange={handleTitleChange}
+                    placeholder="Örn: Kaygıyı Anlamak ve Yönetmek"
+                    className="w-full px-3 py-2 rounded-xl border border-[#E8DFD8] bg-[#FAF7F2] text-xs focus:outline-none focus:border-[#446A5E]"
+                  />
+                </div>
+
+                <div className="grid sm:grid-cols-2 gap-3">
                   <div>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#E5ECE9] text-[#446A5E]">
-                      {post.category}
-                    </span>
-                    <h4 className="font-bold text-sm text-[#192923] mt-1">{post.title}</h4>
-                    <p className="text-xs text-stone-500 mt-0.5">{post.excerpt}</p>
+                    <label className="block text-xs font-bold text-[#192923] mb-1">Kategori</label>
+                    <select
+                      value={blogForm.category}
+                      onChange={(e) => setBlogForm({ ...blogForm, category: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border border-[#E8DFD8] bg-[#FAF7F2] text-xs focus:outline-none focus:border-[#446A5E]"
+                    >
+                      <option value="Yetişkin Terapisi">Yetişkin Terapisi</option>
+                      <option value="Çocuk & Oyun">Çocuk & Oyun</option>
+                      <option value="Klinik Değerlendirme">Klinik Değerlendirme</option>
+                      <option value="Ebeveyn Rehberi">Ebeveyn Rehberi</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-[#192923] mb-1">Okuma Süresi</label>
+                    <input
+                      type="text"
+                      value={blogForm.read_time}
+                      onChange={(e) => setBlogForm({ ...blogForm, read_time: e.target.value })}
+                      placeholder="Örn: 4 dk okuma"
+                      className="w-full px-3 py-2 rounded-xl border border-[#E8DFD8] bg-[#FAF7F2] text-xs focus:outline-none focus:border-[#446A5E]"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#192923] mb-1">Kısa Özet (Excerpt)</label>
+                  <textarea
+                    rows={2}
+                    required
+                    value={blogForm.excerpt}
+                    onChange={(e) => setBlogForm({ ...blogForm, excerpt: e.target.value })}
+                    placeholder="Ana sayfada görünecek 1-2 cümlelik özet..."
+                    className="w-full px-3 py-2 rounded-xl border border-[#E8DFD8] bg-[#FAF7F2] text-xs focus:outline-none focus:border-[#446A5E]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#192923] mb-1">Makale İçeriği</label>
+                  <textarea
+                    rows={6}
+                    required
+                    value={blogForm.content}
+                    onChange={(e) => setBlogForm({ ...blogForm, content: e.target.value })}
+                    placeholder="Yazının tüm detayları..."
+                    className="w-full px-3 py-2 rounded-xl border border-[#E8DFD8] bg-[#FAF7F2] text-xs focus:outline-none focus:border-[#446A5E]"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={blogStatus === 'loading'}
+                  className="w-full py-2.5 rounded-xl bg-[#446A5E] hover:bg-[#335047] text-white font-bold text-xs transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {blogStatus === 'loading' ? 'Yayınlanıyor...' : 'Yazıyı Yayınla'}
+                </button>
+              </form>
+            </div>
+
+            <div className="lg:col-span-6 space-y-3">
+              <h2 className="text-base font-extrabold text-[#192923]">Yayındaki Yazılar ({posts.length})</h2>
+              {posts.map((p) => (
+                <div key={p.id} className="bg-white p-4 rounded-2xl border border-[#E8DFD8] flex items-center justify-between gap-3">
+                  <div>
+                    <span className="text-[10px] font-bold text-[#446A5E] bg-[#E5ECE9] px-2 py-0.5 rounded-full">{p.category}</span>
+                    <h4 className="font-bold text-xs text-[#192923] mt-1">{p.title}</h4>
                   </div>
                   <button
-                    onClick={() => handleDelete(post.id)}
-                    className="p-2 text-stone-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
+                    onClick={() => handleDeletePost(p.id)}
+                    className="p-2 rounded-xl text-stone-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
               ))}
             </div>
-          )}
-        </div>
-      </div>
+          </div>
+        )}
+
+      </main>
+
     </div>
   );
 }

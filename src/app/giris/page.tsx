@@ -1,18 +1,18 @@
 'use client';
 
 import React, { useState } from 'react';
-import { supabase } from '../../lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Lock, Mail, User, Phone, Loader2, AlertCircle } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
+import { Lock, Mail, User, Phone, ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
 
 export default function AuthPage() {
   const router = useRouter();
-  const [isSignUp, setIsSignUp] = useState(false);
+  const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  const [form, setForm] = useState({
+  const [formData, setFormData] = useState({
     fullName: '',
     phone: '',
     email: '',
@@ -25,80 +25,91 @@ export default function AuthPage() {
     setErrorMsg('');
 
     try {
-      if (isSignUp) {
+      if (isLogin) {
+        // Giriş Yap
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: formData.email,
+          password: formData.password
+        });
+
+        if (error) throw error;
+
+        // Admin veya Danışan kontrolü
+        if (data.user?.email === 'melikeermumcu0@gmail.com') {
+          router.push('/admin');
+        } else {
+          router.push('/portal');
+        }
+      } else {
         // Kayıt Ol
         const { data, error } = await supabase.auth.signUp({
-          email: form.email,
-          password: form.password,
+          email: formData.email,
+          password: formData.password,
           options: {
             data: {
-              full_name: form.fullName,
-              phone: form.phone
+              full_name: formData.fullName,
+              phone: formData.phone
             }
           }
         });
 
         if (error) throw error;
 
-        // Profil tablosuna ekle
+        // Profiles tablosuna kullanıcı detayını ekle
         if (data.user) {
-          await supabase.from('profiles').insert({
-            id: data.user.id,
-            full_name: form.fullName,
-            phone: form.phone,
-            role: 'client'
-          });
+          await supabase.from('profiles').insert([
+            {
+              id: data.user.id,
+              full_name: formData.fullName,
+              phone: formData.phone,
+              role: formData.email === 'melikeermumcu0@gmail.com' ? 'admin' : 'client'
+            }
+          ]);
         }
 
         router.push('/portal');
-      } else {
-        // Giriş Yap
-        const { error } = await supabase.auth.signInWithPassword({
-          email: form.email,
-          password: form.password
-        });
-
-        if (error) throw error;
-        router.push('/portal');
       }
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Bir hata oluştu. Lütfen bilgilerinizi kontrol edin.');
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setErrorMsg(err.message === 'Invalid login credentials' ? 'E-posta adresi veya şifre hatalı.' : err.message);
+      } else {
+        setErrorMsg('İşlem sırasında bir hata oluştu.');
+      }
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#FAF7F2] flex items-center justify-center p-4 font-sans selection:bg-[#D6AFA3]">
-      <div className="max-w-md w-full">
+    <div className="min-h-screen bg-[#FAF7F2] text-[#192923] font-sans flex flex-col justify-center items-center p-4 selection:bg-[#D6AFA3]">
+      <div className="w-full max-w-md">
         
         <Link
           href="/"
-          className="inline-flex items-center gap-2 text-xs font-semibold text-[#446A5E] hover:text-[#335047] mb-6"
+          className="inline-flex items-center gap-2 text-xs font-semibold text-[#446A5E] hover:text-[#335047] mb-6 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" /> Ana Sayfaya Dön
         </Link>
 
-        <div className="bg-white p-8 sm:p-10 rounded-3xl border border-[#E8DFD8] shadow-lg">
-          <div className="text-center mb-8">
-            <span className="text-[11px] uppercase tracking-widest text-[#446A5E] font-bold">Danışan Portalı</span>
-            <h1 className="text-2xl font-extrabold text-[#192923] mt-1">
-              {isSignUp ? 'Yeni Danışan Kaydı' : 'Danışan Girişi'}
+        <div className="bg-white p-8 rounded-3xl border border-[#E8DFD8] shadow-sm">
+          <div className="text-center mb-6">
+            <h1 className="text-2xl font-extrabold text-[#192923]">
+              {isLogin ? 'Danışan Portalı Girişi' : 'Yeni Danışan Kaydı'}
             </h1>
             <p className="text-xs text-stone-500 mt-1">
-              {isSignUp ? 'Seanslarınızı ve randevularınızı takip etmek için kayıt olun.' : 'Randevu ve seans bilgilerinize erişmek için giriş yapın.'}
+              {isLogin ? 'Randevularınızı ve idari notlarınızı yönetin' : 'Randevu oluşturmak için hızlıca kayıt olun'}
             </p>
           </div>
 
           {errorMsg && (
-            <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2">
+            <div className="p-3.5 mb-5 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{errorMsg}</span>
             </div>
           )}
 
           <form onSubmit={handleAuth} className="space-y-4">
-            {isSignUp && (
+            {!isLogin && (
               <>
                 <div>
                   <label className="block text-xs font-bold text-[#192923] mb-1">Ad Soyad</label>
@@ -107,25 +118,25 @@ export default function AuthPage() {
                     <input
                       type="text"
                       required
-                      value={form.fullName}
-                      onChange={(e) => setForm({ ...form, fullName: e.target.value })}
-                      placeholder="Adınız Soyadınız"
-                      className="w-full pl-10 pr-4 py-3 rounded-xl border border-[#E8DFD8] bg-[#FAF7F2] text-sm focus:outline-none focus:border-[#446A5E]"
+                      value={formData.fullName}
+                      onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                      placeholder="Adınız ve Soyadınız"
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#E8DFD8] bg-[#FAF7F2] text-sm focus:outline-none focus:border-[#446A5E]"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-[#192923] mb-1">Telefon</label>
+                  <label className="block text-xs font-bold text-[#192923] mb-1">Telefon Numarası</label>
                   <div className="relative">
                     <Phone className="w-4 h-4 text-stone-400 absolute left-3.5 top-3.5" />
                     <input
                       type="tel"
                       required
-                      value={form.phone}
-                      onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                      placeholder="05XX XXX XX XX"
-                      className="w-full pl-10 pr-4 py-3 rounded-xl border border-[#E8DFD8] bg-[#FAF7F2] text-sm focus:outline-none focus:border-[#446A5E]"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      placeholder="05xx xxx xx xx"
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#E8DFD8] bg-[#FAF7F2] text-sm focus:outline-none focus:border-[#446A5E]"
                     />
                   </div>
                 </div>
@@ -133,16 +144,16 @@ export default function AuthPage() {
             )}
 
             <div>
-              <label className="block text-xs font-bold text-[#192923] mb-1">E-Posta</label>
+              <label className="block text-xs font-bold text-[#192923] mb-1">E-Posta Adresi</label>
               <div className="relative">
                 <Mail className="w-4 h-4 text-stone-400 absolute left-3.5 top-3.5" />
                 <input
                   type="email"
                   required
-                  value={form.email}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   placeholder="ornek@mail.com"
-                  className="w-full pl-10 pr-4 py-3 rounded-xl border border-[#E8DFD8] bg-[#FAF7F2] text-sm focus:outline-none focus:border-[#446A5E]"
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#E8DFD8] bg-[#FAF7F2] text-sm focus:outline-none focus:border-[#446A5E]"
                 />
               </div>
             </div>
@@ -154,10 +165,11 @@ export default function AuthPage() {
                 <input
                   type="password"
                   required
-                  value={form.password}
-                  onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  placeholder="••••••••"
-                  className="w-full pl-10 pr-4 py-3 rounded-xl border border-[#E8DFD8] bg-[#FAF7F2] text-sm focus:outline-none focus:border-[#446A5E]"
+                  minLength={6}
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  placeholder="En az 6 karakter"
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#E8DFD8] bg-[#FAF7F2] text-sm focus:outline-none focus:border-[#446A5E]"
                 />
               </div>
             </div>
@@ -165,17 +177,17 @@ export default function AuthPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3.5 rounded-xl bg-[#446A5E] text-white font-bold text-sm hover:bg-[#335047] transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              className="w-full py-3 rounded-xl bg-[#446A5E] hover:bg-[#335047] text-white font-bold text-xs uppercase tracking-wider transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
               {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
                   İşlem yapılıyor...
                 </>
-              ) : isSignUp ? (
-                'Kayıt Ol ve Giriş Yap'
-              ) : (
+              ) : isLogin ? (
                 'Giriş Yap'
+              ) : (
+                'Kayıt Ol ve Giriş Yap'
               )}
             </button>
           </form>
@@ -183,12 +195,12 @@ export default function AuthPage() {
           <div className="mt-6 pt-6 border-t border-[#E8DFD8] text-center">
             <button
               onClick={() => {
-                setIsSignUp(!isSignUp);
+                setIsLogin(!isLogin);
                 setErrorMsg('');
               }}
-              className="text-xs text-[#446A5E] hover:underline font-semibold"
+              className="text-xs text-[#446A5E] hover:text-[#335047] font-semibold transition-colors cursor-pointer"
             >
-              {isSignUp ? 'Zaten hesabınız var mı? Giriş yapın' : 'Hesabınız yok mu? Yeni kayıt oluşturun'}
+              {isLogin ? 'Hesabınız yok mu? Hemen Kayıt Olun' : 'Zaten hesabınız var mı? Giriş Yapın'}
             </button>
           </div>
         </div>
