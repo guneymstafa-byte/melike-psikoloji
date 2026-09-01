@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { 
   HeartHandshake, 
@@ -132,9 +131,9 @@ export default function Home() {
     },
     {
       icon: <Sparkles className="w-8 h-8 text-[#8C7A6B]" />,
-      title: "Klinik & Gelişim Testleri",
-      desc: "MOXO Dikkat Testi, Denver II Gelişimsel Tarama, WISC-R zeka profili ve objektif projektif değerlendirme ölçekleri.",
-      tags: ["MOXO Dikkat Testi", "Denver II Gelişim", "Projektif Testler"]
+      title: "Psikolojik Değerlendirme & Testler",
+      desc: "Çocuk ve ergenlerin gelişimsel, bilişsel, dikkat ve duygusal süreçlerini belirlemeye yönelik standart klinik ölçekler.",
+      tags: ["AGTE", "d2 Dikkat", "Okul Olgunluğu", "Çizim Testleri"]
     },
     {
       icon: <HeartHandshake className="w-8 h-8 text-[#446A5E]" />,
@@ -277,83 +276,60 @@ export default function Home() {
         )}
       </header>
 
-      {/* HERO BÖLÜMÜ */}
-      <section className="relative pt-12 pb-20 sm:pt-20 sm:pb-28 overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-12 gap-12 lg:gap-8 items-center">
-            
-            <div className="lg:col-span-7 space-y-6 text-center lg:text-left">
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#E5ECE9] border border-[#446A5E]/20 text-[#446A5E] text-xs font-semibold">
-                <ShieldCheck className="w-4 h-4" />
-                <span>Akredite & Bilimsel Terapi Ekolleri</span>
-              </div>
-              
-              <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-[#192923] leading-tight">
-                Düşüncelerinizi anlamak, kendinize <span className="text-[#446A5E] italic">güvenli bir alan</span> açmakla başlar.
-              </h1>
-
-              <p className="text-base sm:text-lg text-stone-600 max-w-2xl mx-auto lg:mx-0 leading-relaxed font-normal">
-                Yetişkinlerde Bilişsel Davranışçı Terapi (BDT), çocuk ve ergenlerde Oyun Terapisi ile klinik değerlendirme araçlarını harmanlayarak Alsancak&apos;ta ve online ortamda danışanlarıma profesyonel bir yol haritası sunuyorum.
-              </p>
-
-              <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 pt-2">
-                <a
-                  href="#randevu"
-                  className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-[#446A5E] hover:bg-[#335047] text-white text-sm font-semibold shadow-lg shadow-[#446A5E]/20 hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-2 group"
-                >
-                  <span>Randevu Talebi İletin</span>
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                </a>
-                <a
-                  href="https://wa.me/905306560632"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-[#F5EAE5] border border-[#D6AFA3] text-[#192923] text-sm font-semibold hover:bg-[#EBDCD6] transition-all text-center flex items-center justify-center gap-2"
-                >
-                  <svg className="w-4 h-4 fill-current text-[#446A5E]" viewBox="0 0 24 24">
-                    <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.312.045-.694.076-2.122-.516-1.534-.636-2.529-2.186-2.607-2.29-.076-.104-.627-.834-.627-1.59 0-.756.396-1.127.536-1.28.14-.153.307-.191.41-.191.103 0 .205.001.296.006.096.004.225-.036.352.27.13.312.446 1.085.485 1.164.039.079.065.172.013.276-.052.104-.078.169-.155.26-.078.091-.163.203-.233.273-.078.079-.16.165-.069.321.091.156.405.668.87 1.082.599.534 1.104.699 1.26.778.156.078.247.069.338-.035.091-.104.39-.455.494-.611.104-.156.208-.13.351-.078.144.052.91.43 1.066.508.156.078.26.117.299.182.039.065.039.378-.105.783z"/>
-                  </svg>
-                  WhatsApp ile Danışın
-                </a>
-              </div>
-
-              {/* Güven Rozetleri */}
-              <div className="grid grid-cols-3 gap-4 pt-8 border-t border-[#E8DFD8]">
-                <div className="text-center lg:text-left">
-                  <p className="text-xl sm:text-2xl font-bold text-[#192923]">Klinik Psikoloji</p>
-                  <p className="text-xs text-stone-500 font-medium">Yüksek Lisans Derecesi</p>
-                </div>
-                <div className="text-center lg:text-left">
-                  <p className="text-xl sm:text-2xl font-bold text-[#192923]">BDT & Oyun</p>
-                  <p className="text-xs text-stone-500 font-medium">Uygulayıcı Sertifikalı</p>
-                </div>
-                <div className="text-center lg:text-left">
-                  <p className="text-xl sm:text-2xl font-bold text-[#192923]">%100</p>
-                  <p className="text-xs text-stone-500 font-medium">Gizlilik & Etik İlke</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Fotoğraf Alanı */}
-            <div className="lg:col-span-5 relative flex justify-center">
-              <div className="relative w-full max-w-sm sm:max-w-md aspect-[4/5] rounded-3xl overflow-hidden shadow-2xl border-4 border-white bg-stone-200">
-                <Image
-                  src="/melike-ermumcu.jpg"
-                  alt="Klinik Psikolog Melike Ermumcu"
-                  fill
-                  sizes="(max-width: 768px) 100vw, 50vw"
-                  className="object-cover object-top"
-                  priority
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#192923]/60 via-transparent to-transparent"></div>
-                <div className="absolute bottom-4 left-4 right-4 bg-white/95 backdrop-blur-sm p-4 rounded-2xl border border-white/40 shadow-lg">
-                  <p className="text-xs font-bold text-[#192923]">Klinik Psikolog Melike Ermumcu</p>
-                  <p className="text-[11px] text-[#446A5E] font-medium">Uzm. Klinik Psikolog &bull; Alsancak, İzmir</p>
-                </div>
-              </div>
-            </div>
-
+      {/* HERO BÖLÜMÜ (Fotoğrafsız & Dengeli Tasarım) */}
+      <section className="relative pt-16 pb-20 sm:pt-24 sm:pb-28 overflow-hidden">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-8">
+          
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#E5ECE9] border border-[#446A5E]/20 text-[#446A5E] text-xs font-semibold">
+            <ShieldCheck className="w-4 h-4" />
+            <span>Akredite & Bilimsel Terapi Ekolleri</span>
           </div>
+          
+          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-[#192923] leading-tight">
+            Düşüncelerinizi anlamak, kendinize <span className="text-[#446A5E] italic">güvenli bir alan</span> açmakla başlar.
+          </h1>
+
+          <p className="text-base sm:text-lg text-stone-600 max-w-2xl mx-auto leading-relaxed font-normal">
+            Yetişkinlerde Bilişsel Davranışçı Terapi (BDT), çocuk ve ergenlerde Oyun Terapisi ile klinik değerlendirme araçlarını harmanlayarak Alsancak&apos;ta ve online ortamda danışanlarıma profesyonel bir yol haritası sunuyorum.
+          </p>
+
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
+            <a
+              href="#randevu"
+              className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-[#446A5E] hover:bg-[#335047] text-white text-sm font-semibold shadow-lg shadow-[#446A5E]/20 hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-2 group"
+            >
+              <span>Randevu Talebi İletin</span>
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </a>
+            <a
+              href="https://wa.me/905306560632"
+              target="_blank"
+              rel="noreferrer"
+              className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-[#F5EAE5] border border-[#D6AFA3] text-[#192923] text-sm font-semibold hover:bg-[#EBDCD6] transition-all text-center flex items-center justify-center gap-2"
+            >
+              <svg className="w-4 h-4 fill-current text-[#446A5E]" viewBox="0 0 24 24">
+                <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.312.045-.694.076-2.122-.516-1.534-.636-2.529-2.186-2.607-2.29-.076-.104-.627-.834-.627-1.59 0-.756.396-1.127.536-1.28.14-.153.307-.191.41-.191.103 0 .205.001.296.006.096.004.225-.036.352.27.13.312.446 1.085.485 1.164.039.079.065.172.013.276-.052.104-.078.169-.155.26-.078.091-.163.203-.233.273-.078.079-.16.165-.069.321.091.156.405.668.87 1.082.599.534 1.104.699 1.26.778.156.078.247.069.338-.035.091-.104.39-.455.494-.611.104-.156.208-.13.351-.078.144.052.91.43 1.066.508.156.078.26.117.299.182.039.065.039.378-.105.783z"/>
+              </svg>
+              WhatsApp ile Danışın
+            </a>
+          </div>
+
+          {/* Güven Rozetleri */}
+          <div className="grid grid-cols-3 gap-4 pt-8 border-t border-[#E8DFD8] max-w-2xl mx-auto">
+            <div>
+              <p className="text-xl sm:text-2xl font-bold text-[#192923]">Klinik Psikoloji</p>
+              <p className="text-xs text-stone-500 font-medium">Yüksek Lisans Derecesi</p>
+            </div>
+            <div>
+              <p className="text-xl sm:text-2xl font-bold text-[#192923]">BDT & Oyun</p>
+              <p className="text-xs text-stone-500 font-medium">Uygulayıcı Sertifikalı</p>
+            </div>
+            <div>
+              <p className="text-xl sm:text-2xl font-bold text-[#192923]">%100</p>
+              <p className="text-xs text-stone-500 font-medium">Gizlilik & Etik İlke</p>
+            </div>
+          </div>
+
         </div>
       </section>
 
@@ -471,37 +447,52 @@ export default function Home() {
         </div>
       </section>
 
-      {/* KLİNİK TESTLER */}
+      {/* PSİKOLOJİK DEĞERLENDİRME VE TESTLER (YENİLENMİŞ İÇERİK) */}
       <section id="testler" className="py-20 bg-[#FAF7F2] border-t border-[#E8DFD8]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="bg-[#192923] text-white rounded-3xl p-8 sm:p-14 overflow-hidden relative shadow-2xl">
             <div className="relative z-10 max-w-3xl space-y-6">
-              <span className="text-xs font-bold text-[#D6AFA3] uppercase tracking-widest">Objektif Ölçümleme</span>
+              <span className="text-xs font-bold text-[#D6AFA3] uppercase tracking-widest">Klinik Ölçümleme</span>
               <h2 className="text-3xl sm:text-4xl font-extrabold leading-tight">
-                Uygulanan Klinik Değerlendirme & Gelişim Testleri
+                Psikolojik Değerlendirme ve Testler
               </h2>
               <p className="text-sm sm:text-base text-[#FAF7F2]/80 leading-relaxed">
-                Tanı ve terapi sürecini desteklemek amacıyla dünya standartlarında kabul görmüş ölçekler ve projektif testler uygulanmaktadır.
+                Çocuk ve ergenlerin gelişimsel, bilişsel, dikkat ve duygusal özelliklerini daha kapsamlı değerlendirmek amacıyla, ihtiyaç doğrultusunda çeşitli psikolojik değerlendirme araçlarından yararlanıyorum.
               </p>
 
-              <div className="grid sm:grid-cols-2 gap-4 pt-4">
-                <div className="bg-white/10 backdrop-blur-sm p-4 rounded-2xl border border-white/10 space-y-1">
-                  <h4 className="text-sm font-bold text-white">MOXO Dikkat Testi</h4>
-                  <p className="text-xs text-[#FAF7F2]/70">Dikkat eksikliği, hiperaktivite ve zamanlama profilini bilgisayarlı görsel/işitsel çeldiricilerle ölçer.</p>
-                </div>
-                <div className="bg-white/10 backdrop-blur-sm p-4 rounded-2xl border border-white/10 space-y-1">
-                  <h4 className="text-sm font-bold text-white">Denver II Gelişimsel Tarama</h4>
-                  <p className="text-xs text-[#FAF7F2]/70">0-6 yaş arası çocukların motor, dil ve sosyal beceri gelişimlerini ayrıntılı olarak raporlar.</p>
-                </div>
-                <div className="bg-white/10 backdrop-blur-sm p-4 rounded-2xl border border-white/10 space-y-1">
-                  <h4 className="text-sm font-bold text-white">Projektif Çizim & Çocuk Testleri</h4>
-                  <p className="text-xs text-[#FAF7F2]/70">Bir İnsan Çiz, Louisa Düss Psikanalitik Hikayeler ve Beier Cümle Tamamlama testleri.</p>
-                </div>
-                <div className="bg-white/10 backdrop-blur-sm p-4 rounded-2xl border border-white/10 space-y-1">
-                  <h4 className="text-sm font-bold text-white">Objektif Kişilik & Duygu Ölçekleri</h4>
-                  <p className="text-xs text-[#FAF7F2]/70">Beck Depresyon ve Anksiyete Ölçekleri ile duygu durum haritalandırması.</p>
+              <div className="space-y-4 pt-4 border-t border-white/10">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-[#D6AFA3]">
+                  Uygulanan Klinik Değerlendirme & Gelişim Testleri:
+                </h3>
+
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="bg-white/10 backdrop-blur-sm p-4 rounded-2xl border border-white/10 space-y-1">
+                    <h4 className="text-sm font-bold text-white">Ankara Gelişim Tarama Envanteri (AGTE)</h4>
+                    <p className="text-xs text-[#FAF7F2]/75">Gelişimsel değerlendirme</p>
+                  </div>
+
+                  <div className="bg-white/10 backdrop-blur-sm p-4 rounded-2xl border border-white/10 space-y-1">
+                    <h4 className="text-sm font-bold text-white">d2 Dikkat Testi</h4>
+                    <p className="text-xs text-[#FAF7F2]/75">Dikkat ve seçici dikkat süreçlerinin değerlendirilmesi</p>
+                  </div>
+
+                  <div className="bg-white/10 backdrop-blur-sm p-4 rounded-2xl border border-white/10 space-y-1">
+                    <h4 className="text-sm font-bold text-white">Metropolitan Okul Olgunluğu Testi</h4>
+                    <p className="text-xs text-[#FAF7F2]/75">Okula hazırlık ve okul olgunluğunun değerlendirilmesi</p>
+                  </div>
+
+                  <div className="bg-white/10 backdrop-blur-sm p-4 rounded-2xl border border-white/10 space-y-1">
+                    <h4 className="text-sm font-bold text-white">Çizim Testleri</h4>
+                    <p className="text-xs text-[#FAF7F2]/75">Çocuğun gelişimsel ve duygusal özelliklerinin değerlendirilmesine yönelik projektif değerlendirme araçları</p>
+                  </div>
+
+                  <div className="sm:col-span-2 bg-white/10 backdrop-blur-sm p-4 rounded-2xl border border-white/10 space-y-1">
+                    <h4 className="text-sm font-bold text-white">Duygu Durumu Değerlendirme Ölçekleri</h4>
+                    <p className="text-xs text-[#FAF7F2]/75">Çocuk ve ergenlerde duygu durumu ve psikolojik belirtilerin değerlendirilmesine yardımcı ölçme araçları</p>
+                  </div>
                 </div>
               </div>
+
             </div>
           </div>
         </div>
@@ -716,7 +707,7 @@ export default function Home() {
                       <option value="Online Görüşme">Online Terapi / Görüşme</option>
                       <option value="Bireysel Yetişkin Terapisi">Bireysel Yetişkin Terapisi</option>
                       <option value="Çocuk & Oyun Terapisi">Çocuk & Oyun Terapisi</option>
-                      <option value="MOXO Dikkat Testi & Klinik Değerlendirme">MOXO & Klinik Testler</option>
+                      <option value="Psikolojik Değerlendirme ve Testler">Psikolojik Değerlendirme ve Testler</option>
                       <option value="Ebeveyn Danışmanlığı">Ebeveyn Danışmanlığı</option>
                     </select>
                   </div>
