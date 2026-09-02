@@ -29,8 +29,7 @@ import {
   Lock,
   PlusCircle,
   AlertCircle,
-  Sliders,
-  KeyRound
+  ChevronLeft
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -72,9 +71,10 @@ export default function Home() {
   });
   const [bookingStatus, setBookingStatus] = useState<'idle' | 'loading' | 'success'>('idle');
 
-  // Yönetici Verileri
+  // Yönetici Verileri (Instagram Tarzı Chat İçin)
   const [adminAppointments, setAdminAppointments] = useState<any[]>([]);
   const [adminMessages, setAdminMessages] = useState<any[]>([]);
+  const [selectedClient, setSelectedClient] = useState<{ id: string; name: string } | null>(null);
   const [adminReply, setAdminReply] = useState('');
 
   // Blog Ekleme State
@@ -156,7 +156,12 @@ export default function Home() {
       const { data: appts } = await supabase.from('appointments').select('*').eq('client_id', user.id).order('appointment_date', { ascending: true });
       if (appts) setMyAppointments(appts);
 
-      const { data: msgs } = await supabase.from('portal_messages').select('*').order('created_at', { ascending: true });
+      // Danışan sadece kendine ait mesajları ve adminin kendine yazdığı yanıtları görür
+      const { data: msgs } = await supabase
+        .from('portal_messages')
+        .select('*')
+        .or(`sender_id.eq.${user.id},client_id.eq.${user.id}`)
+        .order('created_at', { ascending: true });
       if (msgs) setMyMessages(msgs);
     }
   }
@@ -305,6 +310,7 @@ export default function Home() {
     const { data, error } = await supabase.from('portal_messages').insert([
       {
         sender_id: currentUser.id,
+        client_id: currentUser.id,
         sender_name: senderName,
         sender_role: 'client',
         message: clientNewMsg.trim()
@@ -317,7 +323,7 @@ export default function Home() {
     }
   };
 
-  // Yönetici İşlemleri
+  // Yönetici Randevu İşlemleri
   const handleUpdateApptStatus = async (id: string, status: 'confirmed' | 'cancelled') => {
     const { error } = await supabase.from('appointments').update({ status }).eq('id', id);
     if (!error) {
@@ -325,13 +331,15 @@ export default function Home() {
     }
   };
 
+  // Yönetici Seçili Danışana Özel Yanıt Gönderme
   const handleSendAdminReply = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!adminReply.trim()) return;
+    if (!adminReply.trim() || !selectedClient) return;
 
     const { data, error } = await supabase.from('portal_messages').insert([
       {
-        sender_id: null,
+        sender_id: currentUser.id,
+        client_id: selectedClient.id,
         sender_name: 'Melike Ermumcu (Klinik Psikolog)',
         sender_role: 'admin',
         message: adminReply.trim()
@@ -343,6 +351,29 @@ export default function Home() {
       setAdminReply('');
     }
   };
+
+  // Instagram Tarzı Mesaj Kutusu: Danışanları Gruplama
+  const clientConversations = React.useMemo(() => {
+    const conversationsMap = new Map<string, { id: string; name: string; lastMessage: string; lastTime: string }>();
+
+    adminMessages.forEach((msg) => {
+      const clientId = msg.sender_role === 'client' ? msg.sender_id : msg.client_id;
+      if (!clientId) return;
+
+      const clientName = msg.sender_role === 'client' ? msg.sender_name : 'Danışan';
+
+      conversationsMap.set(clientId, {
+        id: clientId,
+        name: (conversationsMap.get(clientId)?.name && conversationsMap.get(clientId)!.name !== 'Danışan') 
+          ? conversationsMap.get(clientId)!.name 
+          : clientName,
+        lastMessage: msg.message,
+        lastTime: new Date(msg.created_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      });
+    });
+
+    return Array.from(conversationsMap.values());
+  }, [adminMessages]);
 
   const generateSlug = (text: string) => {
     return text.toLowerCase().trim()
@@ -1174,11 +1205,11 @@ export default function Home() {
                           <p className="text-center text-stone-400 pt-8">Henüz mesaj iletilmedi.</p>
                         ) : (
                           myMessages.map(m => {
-                            const isMe = m.sender_id === currentUser.id;
+                            const isMe = m.sender_role === 'client';
                             return (
                               <div key={m.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
                                 <span className="text-[9px] text-stone-400 mb-0.5">{isMe ? 'Siz' : m.sender_name}</span>
-                                <div className={`p-2.5 rounded-xl max-w-[85%] ${isMe ? 'bg-[#446A5E] text-white rounded-br-none' : 'bg-[#FAF7F2] border text-stone-800 rounded-bl-none'}`}>
+                                <div className={`p-2.5 rounded-2xl max-w-[85%] text-xs ${isMe ? 'bg-[#446A5E] text-white rounded-br-xs' : 'bg-[#FAF7F2] border border-[#E8DFD8] text-stone-800 rounded-bl-xs'}`}>
                                   {m.message}
                                 </div>
                               </div>
@@ -1209,7 +1240,7 @@ export default function Home() {
                       onClick={() => setAdminTab('messages')}
                       className={`flex-1 py-2 font-bold rounded-lg text-[11px] transition-all ${adminTab === 'messages' ? 'bg-[#446A5E] text-white' : 'text-stone-600'}`}
                     >
-                      Mesajlar
+                      Mesajlar ({clientConversations.length})
                     </button>
                     <button
                       onClick={() => setAdminTab('posts')}
@@ -1259,29 +1290,97 @@ export default function Home() {
                     </div>
                   )}
 
+                  {/* INSTAGRAM DM FORMATINDA ADMIN MESAJ KUTUSU */}
                   {adminTab === 'messages' && (
-                    <div className="flex flex-col h-[450px]">
-                      <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-                        {adminMessages.length === 0 ? (
-                          <p className="text-center text-stone-400 pt-8">Henüz mesaj yok.</p>
-                        ) : (
-                          adminMessages.map(m => {
-                            const isMe = m.sender_role === 'admin';
-                            return (
-                              <div key={m.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
-                                <span className="text-[9px] text-stone-400 mb-0.5">{isMe ? 'Siz' : m.sender_name}</span>
-                                <div className={`p-2.5 rounded-xl max-w-[85%] ${isMe ? 'bg-[#446A5E] text-white rounded-br-none' : 'bg-[#FAF7F2] border text-stone-800 rounded-bl-none'}`}>
-                                  {m.message}
-                                </div>
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
-                      <form onSubmit={handleSendAdminReply} className="pt-2 border-t border-[#E8DFD8] flex gap-2">
-                        <input type="text" required value={adminReply} onChange={(e) => setAdminReply(e.target.value)} placeholder="Danışana yanıt iletin..." className="flex-1 px-3 py-2 bg-[#FAF7F2] rounded-xl border text-xs" />
-                        <button type="submit" className="p-2 bg-[#446A5E] text-white rounded-xl cursor-pointer"><Send className="w-3.5 h-3.5" /></button>
-                      </form>
+                    <div className="flex flex-col h-[460px]">
+                      
+                      {/* DURUM A: DANIŞAN SEÇİLMEDİYSE -> INBOX LİSTESİ */}
+                      {!selectedClient ? (
+                        <div className="space-y-2">
+                          <p className="font-bold text-[#192923] text-xs pb-1">Gelen Danışan Kutuları</p>
+                          {clientConversations.length === 0 ? (
+                            <div className="text-center text-stone-400 py-12">
+                              <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                              <p>Henüz danışan mesajı bulunmuyor.</p>
+                            </div>
+                          ) : (
+                            <div className="space-y-1.5">
+                              {clientConversations.map((c) => (
+                                <button
+                                  key={c.id}
+                                  onClick={() => setSelectedClient({ id: c.id, name: c.name })}
+                                  className="w-full p-3 rounded-2xl bg-[#FAF7F2] hover:bg-[#E5ECE9] border border-[#E8DFD8] text-left transition-all flex items-center justify-between cursor-pointer group"
+                                >
+                                  <div className="flex items-center gap-3 overflow-hidden">
+                                    <div className="w-9 h-9 rounded-full bg-[#446A5E] text-white flex items-center justify-center font-bold text-xs shrink-0">
+                                      {c.name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div className="truncate">
+                                      <p className="font-bold text-xs text-[#192923] group-hover:text-[#446A5E] transition-colors">{c.name}</p>
+                                      <p className="text-[11px] text-stone-500 truncate mt-0.5">{c.lastMessage}</p>
+                                    </div>
+                                  </div>
+                                  <span className="text-[10px] text-stone-400 ml-2 shrink-0">{c.lastTime}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        /* DURUM B: DANIŞAN SEÇİLDİYSE -> BİREBİR MESAJLAŞMA EKRANI */
+                        <div className="flex flex-col h-full">
+                          {/* Chat Üst Başlık & Geri Dön Butonu */}
+                          <div className="flex items-center gap-2 pb-2.5 mb-2 border-b border-[#E8DFD8]">
+                            <button
+                              onClick={() => setSelectedClient(null)}
+                              className="p-1.5 rounded-lg hover:bg-[#E5ECE9] text-stone-600 transition-colors cursor-pointer"
+                              title="Mesaj Listesine Dön"
+                            >
+                              <ChevronLeft className="w-4 h-4" />
+                            </button>
+                            <div className="w-7 h-7 rounded-full bg-[#446A5E] text-white flex items-center justify-center font-bold text-xs shrink-0">
+                              {selectedClient.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="truncate">
+                              <p className="font-bold text-xs text-[#192923]">{selectedClient.name}</p>
+                              <p className="text-[9px] text-[#446A5E] font-medium">Birebir Görüşme</p>
+                            </div>
+                          </div>
+
+                          {/* Seçili Danışanın Mesaj Geçmişi */}
+                          <div className="flex-1 overflow-y-auto space-y-2 pr-1 mb-2">
+                            {adminMessages
+                              .filter(m => (m.sender_role === 'client' && m.sender_id === selectedClient.id) || (m.sender_role === 'admin' && m.client_id === selectedClient.id))
+                              .map((m) => {
+                                const isMe = m.sender_role === 'admin';
+                                return (
+                                  <div key={m.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                                    <span className="text-[9px] text-stone-400 mb-0.5">{isMe ? 'Siz' : selectedClient.name}</span>
+                                    <div className={`p-2.5 rounded-2xl max-w-[85%] text-xs ${isMe ? 'bg-[#446A5E] text-white rounded-br-xs' : 'bg-[#FAF7F2] border border-[#E8DFD8] text-stone-800 rounded-bl-xs'}`}>
+                                      {m.message}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                          </div>
+
+                          {/* Yanıt Yazma Formu */}
+                          <form onSubmit={handleSendAdminReply} className="pt-2 border-t border-[#E8DFD8] flex gap-2">
+                            <input
+                              type="text"
+                              required
+                              value={adminReply}
+                              onChange={(e) => setAdminReply(e.target.value)}
+                              placeholder={`${selectedClient.name} danışanına yanıt yazın...`}
+                              className="flex-1 px-3 py-2 bg-[#FAF7F2] rounded-xl border text-xs focus:outline-none focus:border-[#446A5E]"
+                            />
+                            <button type="submit" className="p-2 bg-[#446A5E] text-white rounded-xl cursor-pointer hover:bg-[#335047] transition-colors">
+                              <Send className="w-3.5 h-3.5" />
+                            </button>
+                          </form>
+                        </div>
+                      )}
+
                     </div>
                   )}
 
