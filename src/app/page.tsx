@@ -213,7 +213,6 @@ export default function Home() {
           setAuthForm({ fullName: '', phone: '', email: '', password: '' });
         }
       } else if (authView === 'forgot') {
-        // Çakışmayı önlemek için tarayıcıda eski açık oturum varsa tamamen çıkış yap
         await supabase.auth.signOut();
         setCurrentUser(null);
         setProfile(null);
@@ -503,12 +502,14 @@ export default function Home() {
               </button>
             )}
 
-            <a
-              href="#randevu"
-              className="px-5 py-2.5 rounded-full bg-[#446A5E] hover:bg-[#335047] text-white text-xs font-semibold tracking-wide shadow-sm hover:shadow transition-all"
-            >
-              Randevu Oluştur
-            </a>
+            {!isAdmin && (
+              <a
+                href="#randevu"
+                className="px-5 py-2.5 rounded-full bg-[#446A5E] hover:bg-[#335047] text-white text-xs font-semibold tracking-wide shadow-sm hover:shadow transition-all"
+              >
+                Randevu Oluştur
+              </a>
+            )}
           </div>
 
           <button
@@ -554,13 +555,15 @@ export default function Home() {
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
-            <a
-              href="#randevu"
-              className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-[#446A5E] hover:bg-[#335047] text-white text-sm font-semibold shadow-lg shadow-[#446A5E]/20 hover:shadow-xl transition-all flex items-center justify-center gap-2 group"
-            >
-              <span>Randevu Talebi İletin</span>
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-            </a>
+            {!isAdmin && (
+              <a
+                href="#randevu"
+                className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-[#446A5E] hover:bg-[#335047] text-white text-sm font-semibold shadow-lg shadow-[#446A5E]/20 hover:shadow-xl transition-all flex items-center justify-center gap-2 group"
+              >
+                <span>Randevu Talebi İletin</span>
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </a>
+            )}
             <a
               href="https://wa.me/905306560632"
               target="_blank"
