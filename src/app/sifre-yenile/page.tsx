@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '../../lib/supabase';
-import { Lock, CheckCircle2, AlertCircle, ArrowLeft, Loader2 } from 'lucide-react';
+import { Lock, CheckCircle2, AlertCircle, ArrowLeft, Loader2, UserCheck } from 'lucide-react';
 
 export default function SifreYenilePage() {
   const router = useRouter();
@@ -13,6 +13,40 @@ export default function SifreYenilePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [targetEmail, setTargetEmail] = useState<string | null>(null);
+  const [verifying, setVerifying] = useState(true);
+
+  useEffect(() => {
+    // Sayfa açıldığında linkteki oturumu yakala ve hangi kullanıcının şifresinin değiştiğini belirle
+    const checkSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user?.email) {
+          setTargetEmail(session.user.email);
+        }
+      } catch (err) {
+        console.error("Oturum kontrol hatası:", err);
+      } finally {
+        setVerifying(false);
+      }
+    };
+
+    // Supabase auth state değişimini dinle (linkteki token işlendiğinde tetiklenir)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY' || session?.user) {
+        if (session?.user?.email) {
+          setTargetEmail(session.user.email);
+        }
+        setVerifying(false);
+      }
+    });
+
+    checkSession();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,9 +74,11 @@ export default function SifreYenilePage() {
       }
 
       setSuccess(true);
-      setTimeout(() => {
+      // Şifre güncellendikten sonra eski oturumu tamamen temizle ve ana sayfaya yönlendir
+      setTimeout(async () => {
+        await supabase.auth.signOut();
         router.push('/');
-      }, 3000);
+      }, 2500);
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message || 'Şifre güncellenirken bir hata oluştu.');
@@ -54,6 +90,17 @@ export default function SifreYenilePage() {
     }
   };
 
+  if (verifying) {
+    return (
+      <div className="min-h-screen bg-[#FAF7F2] flex items-center justify-center p-4">
+        <div className="flex items-center gap-3 text-sm text-[#192923] font-medium">
+          <Loader2 className="w-5 h-5 animate-spin text-[#446A5E]" />
+          <span>Güvenlik doğrulaması yapılıyor...</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#FAF7F2] text-[#192923] font-sans flex items-center justify-center p-4">
       <div className="w-full max-w-md bg-white p-8 rounded-3xl border border-[#E8DFD8] shadow-sm space-y-6">
@@ -63,9 +110,17 @@ export default function SifreYenilePage() {
             <ArrowLeft className="w-3.5 h-3.5" /> Ana Sayfaya Dön
           </Link>
           <h1 className="text-xl font-extrabold text-[#192923]">Yeni Şifre Belirleyin</h1>
-          <p className="text-xs text-stone-500 mt-1">
-            Lütfen hesabınız için kullanmak istediğiniz yeni şifrenizi girin.
-          </p>
+          
+          {targetEmail ? (
+            <div className="mt-2.5 p-3 rounded-xl bg-[#E5ECE9] border border-[#446A5E]/20 text-[#192923] text-xs flex items-center gap-2">
+              <UserCheck className="w-4 h-4 text-[#446A5E] shrink-0" />
+              <span>İşlem yapılan hesap: <strong className="text-[#446A5E]">{targetEmail}</strong></span>
+            </div>
+          ) : (
+            <p className="text-xs text-stone-500 mt-1">
+              Lütfen hesabınız için kullanmak istediğiniz yeni şifrenizi girin.
+            </p>
+          )}
         </div>
 
         {error && (
@@ -76,10 +131,10 @@ export default function SifreYenilePage() {
         )}
 
         {success ? (
-          <div className="p-4 rounded-2xl bg-[#E5ECE9] border border-[#446A5E]/30 text-[#446A5E] text-xs space-y-2 text-center">
-            <CheckCircle2 className="w-6 h-6 mx-auto" />
-            <p className="font-bold text-sm">Şifreniz başarıyla güncellendi!</p>
-            <p className="text-stone-600">Ana sayfaya yönlendiriliyorsunuz...</p>
+          <div className="p-5 rounded-2xl bg-[#E5ECE9] border border-[#446A5E]/30 text-[#446A5E] text-xs space-y-2 text-center">
+            <CheckCircle2 className="w-7 h-7 mx-auto text-[#446A5E]" />
+            <p className="font-bold text-sm">Şifreniz başarıyla yenilendi!</p>
+            <p className="text-stone-600">Güvenliğiniz için oturumunuz kapatıldı. Ana sayfaya yönlendiriliyorsunuz, yeni şifrenizle giriş yapabilirsiniz.</p>
           </div>
         ) : (
           <form onSubmit={handleUpdatePassword} className="space-y-4">

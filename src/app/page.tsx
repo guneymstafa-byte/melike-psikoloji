@@ -180,7 +180,7 @@ export default function Home() {
     try {
       if (authView === 'login') {
         const { data, error } = await supabase.auth.signInWithPassword({
-          email: authForm.email,
+          email: authForm.email.trim().toLowerCase(),
           password: authForm.password
         });
         if (error) throw error;
@@ -190,8 +190,9 @@ export default function Home() {
           setAuthForm({ fullName: '', phone: '', email: '', password: '' });
         }
       } else if (authView === 'register') {
+        const cleanEmail = authForm.email.trim().toLowerCase();
         const { data, error } = await supabase.auth.signUp({
-          email: authForm.email,
+          email: cleanEmail,
           password: authForm.password,
           options: {
             data: { full_name: authForm.fullName, phone: authForm.phone }
@@ -204,7 +205,7 @@ export default function Home() {
               id: data.user.id,
               full_name: authForm.fullName,
               phone: authForm.phone,
-              role: authForm.email === 'melikeermumcu0@gmail.com' ? 'admin' : 'client'
+              role: cleanEmail === 'melikeermumcu0@gmail.com' ? 'admin' : 'client'
             }
           ]);
           setCurrentUser(data.user);
@@ -212,10 +213,20 @@ export default function Home() {
           setAuthForm({ fullName: '', phone: '', email: '', password: '' });
         }
       } else if (authView === 'forgot') {
-        const redirectUrl = typeof window !== 'undefined' ? `${window.location.origin}/sifre-yenile` : 'https://melike-psikoloji-rhjm.vercel.app/sifre-yenile';
-        const { error } = await supabase.auth.resetPasswordForEmail(authForm.email, {
+        // Çakışmayı önlemek için tarayıcıda eski açık oturum varsa tamamen çıkış yap
+        await supabase.auth.signOut();
+        setCurrentUser(null);
+        setProfile(null);
+
+        const redirectUrl = typeof window !== 'undefined' 
+          ? `${window.location.origin}/sifre-yenile` 
+          : 'https://melike-psikoloji-rhjm.vercel.app/sifre-yenile';
+
+        const cleanEmail = authForm.email.trim().toLowerCase();
+        const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
           redirectTo: redirectUrl
         });
+
         if (error) throw error;
         setResetSent(true);
       }
