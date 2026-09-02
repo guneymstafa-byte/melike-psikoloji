@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { 
   HeartHandshake, 
@@ -29,7 +29,12 @@ import {
   Lock,
   PlusCircle,
   AlertCircle,
-  ChevronLeft
+  ChevronLeft,
+  Target,
+  KeyRound,
+  CheckSquare,
+  Square,
+  ListTodo
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -54,13 +59,19 @@ export default function Home() {
     password: ''
   });
 
+  // Şifre Değiştirme (Hesabım Sekmesi)
+  const [newPassword, setNewPassword] = useState('');
+  const [changePassStatus, setChangePassStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [changePassMsg, setChangePassMsg] = useState('');
+
   // Danışan & Admin Sekmeleri
-  const [clientTab, setClientTab] = useState<'appointments' | 'messages'>('appointments');
-  const [adminTab, setAdminTab] = useState<'appointments' | 'messages' | 'posts'>('appointments');
+  const [clientTab, setClientTab] = useState<'appointments' | 'journey' | 'account' | 'messages'>('appointments');
+  const [adminTab, setAdminTab] = useState<'appointments' | 'messages' | 'tasks' | 'posts'>('appointments');
 
   // Danışan Verileri
   const [myAppointments, setMyAppointments] = useState<any[]>([]);
   const [myMessages, setMyMessages] = useState<any[]>([]);
+  const [myTasks, setMyTasks] = useState<any[]>([]);
   const [clientNewMsg, setClientNewMsg] = useState('');
   const [showBooking, setShowBooking] = useState(false);
   const [bookingData, setBookingData] = useState({
@@ -71,11 +82,20 @@ export default function Home() {
   });
   const [bookingStatus, setBookingStatus] = useState<'idle' | 'loading' | 'success'>('idle');
 
-  // Yönetici Verileri (Instagram Tarzı Chat İçin)
+  // Yönetici Verileri
   const [adminAppointments, setAdminAppointments] = useState<any[]>([]);
   const [adminMessages, setAdminMessages] = useState<any[]>([]);
+  const [adminTasks, setAdminTasks] = useState<any[]>([]);
   const [selectedClient, setSelectedClient] = useState<{ id: string; name: string } | null>(null);
   const [adminReply, setAdminReply] = useState('');
+
+  // Admin Görev/Ödev Ekleme Formu
+  const [taskForm, setTaskForm] = useState({
+    clientId: '',
+    title: '',
+    description: '',
+    type: 'homework'
+  });
 
   // Blog Ekleme State
   const [blogForm, setBlogForm] = useState({
@@ -152,17 +172,26 @@ export default function Home() {
 
       const { data: msgs } = await supabase.from('portal_messages').select('*').order('created_at', { ascending: true });
       if (msgs) setAdminMessages(msgs);
+
+      const { data: tsks } = await supabase.from('client_tasks').select('*').order('created_at', { ascending: false });
+      if (tsks) setAdminTasks(tsks);
     } else {
       const { data: appts } = await supabase.from('appointments').select('*').eq('client_id', user.id).order('appointment_date', { ascending: true });
       if (appts) setMyAppointments(appts);
 
-      // Danışan sadece kendine ait mesajları ve adminin kendine yazdığı yanıtları görür
       const { data: msgs } = await supabase
         .from('portal_messages')
         .select('*')
         .or(`sender_id.eq.${user.id},client_id.eq.${user.id}`)
         .order('created_at', { ascending: true });
       if (msgs) setMyMessages(msgs);
+
+      const { data: tsks } = await supabase
+        .from('client_tasks')
+        .select('*')
+        .eq('client_id', user.id)
+        .order('created_at', { ascending: false });
+      if (tsks) setMyTasks(tsks);
     }
   }
 
@@ -250,6 +279,39 @@ export default function Home() {
     setCurrentUser(null);
     setProfile(null);
     setDrawerOpen(false);
+  };
+
+  // Danışan Kendi Şifresini Değiştirme
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword.length < 6) {
+      setChangePassMsg('Şifre en az 6 karakter olmalıdır.');
+      setChangePassStatus('error');
+      return;
+    }
+    setChangePassStatus('loading');
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) {
+      setChangePassStatus('error');
+      setChangePassMsg(error.message);
+    } else {
+      setChangePassStatus('success');
+      setChangePassMsg('Şifreniz başarıyla güncellendi.');
+      setNewPassword('');
+      setTimeout(() => setChangePassStatus('idle'), 3000);
+    }
+  };
+
+  // Danışan Ev Ödevi Tamamlandı İşareti
+  const toggleTaskCompleted = async (taskId: string, currentStatus: boolean) => {
+    const { error } = await supabase
+      .from('client_tasks')
+      .update({ is_completed: !currentStatus })
+      .eq('id', taskId);
+
+    if (!error) {
+      setMyTasks(myTasks.map(t => t.id === taskId ? { ...t, is_completed: !currentStatus } : t));
+    }
   };
 
   // Danışan Randevu Talebi
@@ -352,8 +414,30 @@ export default function Home() {
     }
   };
 
+  // Admin Danışana Görev/Hedef Ekleme
+  const handleCreateTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!taskForm.clientId || !taskForm.title) return;
+
+    const { data, error } = await supabase.from('client_tasks').insert([
+      {
+        client_id: taskForm.clientId,
+        title: taskForm.title,
+        description: taskForm.description,
+        type: taskForm.type,
+        is_completed: false
+      }
+    ]).select();
+
+    if (!error && data) {
+      setAdminTasks([data[0], ...adminTasks]);
+      setTaskForm({ clientId: '', title: '', description: '', type: 'homework' });
+      alert('Ödev/Hedef danışana başarıyla tanımlandı.');
+    }
+  };
+
   // Instagram Tarzı Mesaj Kutusu: Danışanları Gruplama
-  const clientConversations = React.useMemo(() => {
+  const clientConversations = useMemo(() => {
     const conversationsMap = new Map<string, { id: string; name: string; lastMessage: string; lastTime: string }>();
 
     adminMessages.forEach((msg) => {
@@ -374,6 +458,14 @@ export default function Home() {
 
     return Array.from(conversationsMap.values());
   }, [adminMessages]);
+
+  // Admin İçin Danışan Listesi (Hedef/Ödev Ataması Yapabilmek İçin)
+  const uniqueClients = useMemo(() => {
+    const map = new Map<string, string>();
+    adminAppointments.forEach(a => { if (a.client_id) map.set(a.client_id, a.client_name); });
+    clientConversations.forEach(c => { map.set(c.id, c.name); });
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  }, [adminAppointments, clientConversations]);
 
   const generateSlug = (text: string) => {
     return text.toLowerCase().trim()
@@ -501,7 +593,6 @@ export default function Home() {
             </span>
           </Link>
 
-          {/* Menü */}
           <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-[#192923]/80">
             <a href="#hakkimda" className="hover:text-[#446A5E] transition-colors">Hakkımda</a>
             <a href="#uzmanliklar" className="hover:text-[#446A5E] transition-colors">Uzmanlıklar</a>
@@ -510,7 +601,6 @@ export default function Home() {
             <a href="#sss" className="hover:text-[#446A5E] transition-colors">Sıkça Sorulanlar</a>
           </nav>
 
-          {/* Sağ Butonlar */}
           <div className="hidden md:flex items-center gap-3">
             {currentUser ? (
               <button
@@ -551,7 +641,6 @@ export default function Home() {
           </button>
         </div>
 
-        {/* Mobil Menü */}
         {mobileMenuOpen && (
           <div className="md:hidden bg-[#FAF7F2] border-b border-[#E8DFD8] px-4 pt-2 pb-6 space-y-3">
             <a href="#hakkimda" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-sm font-medium text-[#192923]">Hakkımda</a>
@@ -623,7 +712,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* HAKKIMDA BÖLÜMÜ */}
+      {/* HAKKIMDA */}
       <section id="hakkimda" className="py-20 bg-white border-y border-[#E8DFD8]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-12 gap-12 items-center">
@@ -756,7 +845,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* BLOG BÖLÜMÜ */}
+      {/* BLOG */}
       <section id="blog" className="py-20 bg-white border-y border-[#E8DFD8]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="space-y-2 mb-12">
@@ -796,7 +885,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* SSS BÖLÜMÜ */}
+      {/* SSS */}
       <section id="sss" className="py-20">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center space-y-3 mb-12">
@@ -1127,24 +1216,38 @@ export default function Home() {
                 </div>
               )}
 
-              {/* 2. DANIŞAN GİRİŞİ YAPILDIYSA */}
+              {/* 2. DANIŞAN GİRİŞİ YAPILDIYSA (YENİ 4'LÜ MİMARİ) */}
               {currentUser && !isAdmin && (
                 <div className="space-y-4">
-                  <div className="flex bg-[#FAF7F2] p-1 rounded-xl border border-[#E8DFD8]">
+                  {/* Danışan Sekme Butonları */}
+                  <div className="grid grid-cols-4 bg-[#FAF7F2] p-1 rounded-xl border border-[#E8DFD8] text-[10px] font-bold text-center">
                     <button
                       onClick={() => setClientTab('appointments')}
-                      className={`flex-1 py-2 font-bold rounded-lg transition-all ${clientTab === 'appointments' ? 'bg-[#446A5E] text-white' : 'text-stone-600'}`}
+                      className={`py-2 rounded-lg transition-all ${clientTab === 'appointments' ? 'bg-[#446A5E] text-white' : 'text-stone-600'}`}
                     >
-                      Randevularım ({myAppointments.length})
+                      Seanslar ({myAppointments.length})
+                    </button>
+                    <button
+                      onClick={() => setClientTab('journey')}
+                      className={`py-2 rounded-lg transition-all ${clientTab === 'journey' ? 'bg-[#446A5E] text-white' : 'text-stone-600'}`}
+                    >
+                      Sürecim
                     </button>
                     <button
                       onClick={() => setClientTab('messages')}
-                      className={`flex-1 py-2 font-bold rounded-lg transition-all ${clientTab === 'messages' ? 'bg-[#446A5E] text-white' : 'text-stone-600'}`}
+                      className={`py-2 rounded-lg transition-all ${clientTab === 'messages' ? 'bg-[#446A5E] text-white' : 'text-stone-600'}`}
                     >
-                      İdari Not / Mesaj
+                      Mesajlar
+                    </button>
+                    <button
+                      onClick={() => setClientTab('account')}
+                      className={`py-2 rounded-lg transition-all ${clientTab === 'account' ? 'bg-[#446A5E] text-white' : 'text-stone-600'}`}
+                    >
+                      Hesabım
                     </button>
                   </div>
 
+                  {/* SEKME 1: RANDEVULAR */}
                   {clientTab === 'appointments' && (
                     <div className="space-y-3">
                       <div className="flex justify-between items-center">
@@ -1198,6 +1301,77 @@ export default function Home() {
                     </div>
                   )}
 
+                  {/* SEKME 2: TERAPİ YOLCULUĞUM (SÜRECİM) */}
+                  {clientTab === 'journey' && (
+                    <div className="space-y-4">
+                      {/* Seans İlerleme Özeti */}
+                      <div className="p-4 rounded-2xl bg-gradient-to-br from-[#192923] to-[#2B453B] text-white space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs font-bold text-[#D6AFA3]">Klinik Yolculuk</span>
+                          <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded-full">
+                            {myAppointments.filter(a => a.status === 'confirmed').length} Seans Tamamlandı
+                          </span>
+                        </div>
+                        <p className="text-sm font-extrabold">{profile?.full_name || 'Danışan'}</p>
+                        <p className="text-[11px] text-stone-300 leading-relaxed">
+                          Psikoloğunuzla birlikte belirlediğiniz hedefler ve seans arası pekiştirme uygulamalarınız burada listelenir.
+                        </p>
+                      </div>
+
+                      {/* Ödevler ve Hedefler Listesi */}
+                      <div className="space-y-2.5">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-[#192923]">
+                          <ListTodo className="w-4 h-4 text-[#446A5E]" />
+                          <span>Seans Arası Uygulamalar & Hedefler</span>
+                        </div>
+
+                        {myTasks.length === 0 ? (
+                          <div className="p-5 rounded-2xl bg-[#FAF7F2] border border-[#E8DFD8] text-center text-stone-400 space-y-1">
+                            <Target className="w-6 h-6 mx-auto opacity-40 text-[#446A5E]" />
+                            <p className="font-bold text-xs text-stone-600">Henüz tanımlanmış ödev bulunmuyor.</p>
+                            <p className="text-[10px]">İlk görüşmenizin ardından psikoloğunuz buraya size özel çalışmalar ekleyecektir.</p>
+                          </div>
+                        ) : (
+                          myTasks.map((t) => (
+                            <div 
+                              key={t.id} 
+                              onClick={() => toggleTaskCompleted(t.id, t.is_completed)}
+                              className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-start gap-3 ${
+                                t.is_completed 
+                                  ? 'bg-[#E5ECE9]/50 border-[#446A5E]/30 opacity-75' 
+                                  : 'bg-white border-[#E8DFD8] hover:border-[#446A5E]'
+                              }`}
+                            >
+                              <div className="mt-0.5">
+                                {t.is_completed ? (
+                                  <CheckSquare className="w-4 h-4 text-[#446A5E]" />
+                                ) : (
+                                  <Square className="w-4 h-4 text-stone-400" />
+                                )}
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex items-center justify-between">
+                                  <p className={`font-bold text-xs ${t.is_completed ? 'line-through text-stone-500' : 'text-[#192923]'}`}>
+                                    {t.title}
+                                  </p>
+                                  <span className="text-[9px] px-2 py-0.5 rounded-full font-bold bg-[#FAF7F2] border text-stone-500">
+                                    {t.type === 'homework' ? 'Ev Ödevi' : 'Hedef'}
+                                  </span>
+                                </div>
+                                {t.description && (
+                                  <p className="text-[11px] text-stone-600 mt-1 leading-relaxed">
+                                    {t.description}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* SEKME 3: MESAJLAR */}
                   {clientTab === 'messages' && (
                     <div className="flex flex-col h-[450px]">
                       <div className="flex-1 overflow-y-auto space-y-2 pr-1">
@@ -1223,33 +1397,101 @@ export default function Home() {
                       </form>
                     </div>
                   )}
+
+                  {/* SEKME 4: HESABIM & GÜVENLİK */}
+                  {clientTab === 'account' && (
+                    <div className="space-y-4">
+                      <div className="p-4 rounded-2xl bg-[#FAF7F2] border border-[#E8DFD8] space-y-2">
+                        <span className="text-[10px] font-bold text-[#446A5E] uppercase tracking-wider">Hesap Bilgileri</span>
+                        <div>
+                          <p className="text-xs font-bold text-[#192923]">{profile?.full_name || 'Danışan'}</p>
+                          <p className="text-[11px] text-stone-500">{currentUser.email}</p>
+                          <p className="text-[11px] text-stone-500 mt-0.5">{profile?.phone || 'Telefon belirtilmemiş'}</p>
+                        </div>
+                      </div>
+
+                      {/* Şifre Değiştirme */}
+                      <div className="p-4 rounded-2xl bg-white border border-[#E8DFD8] space-y-3">
+                        <div className="flex items-center gap-2">
+                          <KeyRound className="w-4 h-4 text-[#446A5E]" />
+                          <h4 className="font-bold text-xs text-[#192923]">Şifre Değiştir</h4>
+                        </div>
+
+                        {changePassMsg && (
+                          <div className={`p-2.5 rounded-xl text-xs flex items-center gap-2 ${
+                            changePassStatus === 'success' 
+                              ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' 
+                              : 'bg-red-50 text-red-800 border border-red-200'
+                          }`}>
+                            <AlertCircle className="w-4 h-4 shrink-0" />
+                            <span>{changePassMsg}</span>
+                          </div>
+                        )}
+
+                        <form onSubmit={handleChangePassword} className="space-y-2.5">
+                          <input
+                            type="password"
+                            required
+                            minLength={6}
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            placeholder="Yeni şifreniz (en az 6 karakter)"
+                            className="w-full px-3 py-2 bg-[#FAF7F2] rounded-xl border border-[#E8DFD8] text-xs focus:outline-none focus:border-[#446A5E]"
+                          />
+                          <button
+                            type="submit"
+                            disabled={changePassStatus === 'loading'}
+                            className="w-full py-2.5 rounded-xl bg-[#446A5E] hover:bg-[#335047] text-white font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
+                          >
+                            {changePassStatus === 'loading' ? 'Güncelleniyor...' : 'Şifreyi Güncelle'}
+                          </button>
+                        </form>
+                      </div>
+
+                      <button
+                        onClick={handleLogout}
+                        className="w-full py-3 rounded-2xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        <span>Hesaptan Güvenli Çıkış Yap</span>
+                      </button>
+                    </div>
+                  )}
+
                 </div>
               )}
 
               {/* 3. YÖNETİCİ (MELİKE ERMUMCU) GİRİŞİ */}
               {currentUser && isAdmin && (
                 <div className="space-y-4">
-                  <div className="flex bg-[#FAF7F2] p-1 rounded-xl border border-[#E8DFD8]">
+                  <div className="grid grid-cols-4 bg-[#FAF7F2] p-1 rounded-xl border border-[#E8DFD8] text-[10px] font-bold text-center">
                     <button
                       onClick={() => setAdminTab('appointments')}
-                      className={`flex-1 py-2 font-bold rounded-lg text-[11px] transition-all ${adminTab === 'appointments' ? 'bg-[#446A5E] text-white' : 'text-stone-600'}`}
+                      className={`py-2 rounded-lg transition-all ${adminTab === 'appointments' ? 'bg-[#446A5E] text-white' : 'text-stone-600'}`}
                     >
                       Randevular ({adminAppointments.filter(a => a.status === 'pending').length})
                     </button>
                     <button
                       onClick={() => setAdminTab('messages')}
-                      className={`flex-1 py-2 font-bold rounded-lg text-[11px] transition-all ${adminTab === 'messages' ? 'bg-[#446A5E] text-white' : 'text-stone-600'}`}
+                      className={`py-2 rounded-lg transition-all ${adminTab === 'messages' ? 'bg-[#446A5E] text-white' : 'text-stone-600'}`}
                     >
                       Mesajlar ({clientConversations.length})
                     </button>
                     <button
+                      onClick={() => setAdminTab('tasks')}
+                      className={`py-2 rounded-lg transition-all ${adminTab === 'tasks' ? 'bg-[#446A5E] text-white' : 'text-stone-600'}`}
+                    >
+                      Ödev/Hedef
+                    </button>
+                    <button
                       onClick={() => setAdminTab('posts')}
-                      className={`flex-1 py-2 font-bold rounded-lg text-[11px] transition-all ${adminTab === 'posts' ? 'bg-[#446A5E] text-white' : 'text-stone-600'}`}
+                      className={`py-2 rounded-lg transition-all ${adminTab === 'posts' ? 'bg-[#446A5E] text-white' : 'text-stone-600'}`}
                     >
                       Yazı Ekle
                     </button>
                   </div>
 
+                  {/* SEKME 1: RANDEVULAR */}
                   {adminTab === 'appointments' && (
                     <div className="space-y-3">
                       <p className="font-bold text-[#192923]">Danışan Randevu Talepleri</p>
@@ -1290,11 +1532,9 @@ export default function Home() {
                     </div>
                   )}
 
-                  {/* INSTAGRAM DM FORMATINDA ADMIN MESAJ KUTUSU */}
+                  {/* SEKME 2: INSTAGRAM DM FORMATINDA ADMIN MESAJ KUTUSU */}
                   {adminTab === 'messages' && (
                     <div className="flex flex-col h-[460px]">
-                      
-                      {/* DURUM A: DANIŞAN SEÇİLMEDİYSE -> INBOX LİSTESİ */}
                       {!selectedClient ? (
                         <div className="space-y-2">
                           <p className="font-bold text-[#192923] text-xs pb-1">Gelen Danışan Kutuları</p>
@@ -1327,9 +1567,7 @@ export default function Home() {
                           )}
                         </div>
                       ) : (
-                        /* DURUM B: DANIŞAN SEÇİLDİYSE -> BİREBİR MESAJLAŞMA EKRANI */
                         <div className="flex flex-col h-full">
-                          {/* Chat Üst Başlık & Geri Dön Butonu */}
                           <div className="flex items-center gap-2 pb-2.5 mb-2 border-b border-[#E8DFD8]">
                             <button
                               onClick={() => setSelectedClient(null)}
@@ -1347,7 +1585,6 @@ export default function Home() {
                             </div>
                           </div>
 
-                          {/* Seçili Danışanın Mesaj Geçmişi */}
                           <div className="flex-1 overflow-y-auto space-y-2 pr-1 mb-2">
                             {adminMessages
                               .filter(m => (m.sender_role === 'client' && m.sender_id === selectedClient.id) || (m.sender_role === 'admin' && m.client_id === selectedClient.id))
@@ -1364,7 +1601,6 @@ export default function Home() {
                               })}
                           </div>
 
-                          {/* Yanıt Yazma Formu */}
                           <form onSubmit={handleSendAdminReply} className="pt-2 border-t border-[#E8DFD8] flex gap-2">
                             <input
                               type="text"
@@ -1380,10 +1616,84 @@ export default function Home() {
                           </form>
                         </div>
                       )}
-
                     </div>
                   )}
 
+                  {/* SEKME 3: DANIŞANA ÖDEV / HEDEF TANIMLAMA */}
+                  {adminTab === 'tasks' && (
+                    <div className="space-y-4">
+                      <div className="p-3.5 bg-[#FAF7F2] rounded-2xl border border-[#E8DFD8] space-y-3">
+                        <p className="font-bold text-[#192923] text-xs">Danışana Yeni Ödev/Hedef Tanımla</p>
+                        <form onSubmit={handleCreateTask} className="space-y-2">
+                          <select
+                            required
+                            value={taskForm.clientId}
+                            onChange={(e) => setTaskForm({ ...taskForm, clientId: e.target.value })}
+                            className="w-full p-2 bg-white rounded-lg border text-xs"
+                          >
+                            <option value="">Danışan Seçin...</option>
+                            {uniqueClients.map(c => (
+                              <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                          </select>
+
+                          <input
+                            type="text"
+                            required
+                            placeholder="Başlık (Örn: Otomatik Düşünce Kayıt Formu)"
+                            value={taskForm.title}
+                            onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })}
+                            className="w-full p-2 bg-white rounded-lg border text-xs"
+                          />
+
+                          <textarea
+                            rows={2}
+                            placeholder="Açıklama / Danışana Not (Örn: Hafta içi kaygı hissettiğiniz 2 anı not edin)"
+                            value={taskForm.description}
+                            onChange={(e) => setTaskForm({ ...taskForm, description: e.target.value })}
+                            className="w-full p-2 bg-white rounded-lg border text-xs"
+                          />
+
+                          <div className="flex gap-2">
+                            <select
+                              value={taskForm.type}
+                              onChange={(e) => setTaskForm({ ...taskForm, type: e.target.value })}
+                              className="flex-1 p-2 bg-white rounded-lg border text-xs"
+                            >
+                              <option value="homework">Ev Ödevi</option>
+                              <option value="goal">Terapi Hedefi</option>
+                            </select>
+                            <button
+                              type="submit"
+                              className="px-4 py-2 bg-[#446A5E] text-white font-bold rounded-lg text-xs cursor-pointer hover:bg-[#335047]"
+                            >
+                              Kaydet ve Ata
+                            </button>
+                          </div>
+                        </form>
+                      </div>
+
+                      {/* Önceden Tanımlananlar */}
+                      <div className="space-y-2">
+                        <p className="font-bold text-[#192923] text-xs">Atanan Ödevler ({adminTasks.length})</p>
+                        <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                          {adminTasks.map((t) => (
+                            <div key={t.id} className="p-2.5 bg-[#FAF7F2] rounded-xl border border-[#E8DFD8] text-[11px] flex justify-between items-start">
+                              <div>
+                                <p className="font-bold text-[#192923]">{t.title}</p>
+                                <p className="text-stone-500 text-[10px] mt-0.5">{t.description}</p>
+                              </div>
+                              <span className={`px-2 py-0.5 rounded-full font-bold text-[9px] ${t.is_completed ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                                {t.is_completed ? 'Tamamlandı' : 'Bekliyor'}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* SEKME 4: BLOG YAZISI EKLEME */}
                   {adminTab === 'posts' && (
                     <div className="space-y-3">
                       <p className="font-bold text-[#192923]">Yeni Blog Yazısı Ekle</p>
