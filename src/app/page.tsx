@@ -34,7 +34,9 @@ import {
   KeyRound,
   CheckSquare,
   Square,
-  ListTodo
+  ListTodo,
+  Pencil,
+  Trash2
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -59,7 +61,7 @@ export default function Home() {
     password: ''
   });
 
-  // Şifre Değiştirme (Hesabım Sekmesi)
+  // Şifre Değiştirme
   const [newPassword, setNewPassword] = useState('');
   const [changePassStatus, setChangePassStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [changePassMsg, setChangePassMsg] = useState('');
@@ -97,7 +99,9 @@ export default function Home() {
     type: 'homework'
   });
 
-  // Blog Ekleme State
+  // Blog Yazıları ve Blog Formu (Ekleme / Düzenleme)
+  const [blogPosts, setBlogPosts] = useState<any[]>([]);
+  const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [blogForm, setBlogForm] = useState({
     title: '',
     slug: '',
@@ -118,34 +122,6 @@ export default function Home() {
     note: ''
   });
   const [formStatus, setFormStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-
-  // Dinamik Blog Yazıları
-  const [blogPosts, setBlogPosts] = useState<any[]>([
-    {
-      id: '1',
-      slug: 'kaygiyi-anlamak-ve-yonetmek',
-      title: 'Kaygıyı Anlamak ve Yönetmek: Bilişsel Bir Bakış',
-      excerpt: 'Sürekli endişe ve kaygı halinde zihnimizin ürettiği otomatik düşünceleri fark etmek, kaygıyla başa çıkmanın ilk adımıdır.',
-      category: 'Yetişkin Terapisi',
-      read_time: '4 dk okuma'
-    },
-    {
-      id: '2',
-      slug: 'oyun-terapisi-cocuklarin-dili',
-      title: 'Çocukların Doğal Dili: Oyun Terapisi Neden Önemlidir?',
-      excerpt: 'Yetişkinler duygularını kelimelerle ifade ederken, çocuklar dünyayı ve içsel çatışmalarını oyunlar ve oyuncaklar aracılığıyla anlatır.',
-      category: 'Çocuk & Oyun',
-      read_time: '5 dk okuma'
-    },
-    {
-      id: '3',
-      slug: 'psikolojik-testler-ne-soyler',
-      title: 'Psikolojik Testler Bize Ne Söyler, Ne Söylemez?',
-      excerpt: 'MMPI ve gelişim testleri bir etiket değil; bireyi daha derinlemesine tanıyıp doğru bir terapi haritası çizmenin araçlarıdır.',
-      category: 'Klinik Değerlendirme',
-      read_time: '3 dk okuma'
-    }
-  ]);
 
   const isAdmin = currentUser?.email === 'melikeermumcu0@gmail.com';
 
@@ -198,7 +174,7 @@ export default function Home() {
   async function fetchLatestPosts() {
     try {
       const { data, error } = await supabase.from('posts').select('*').order('created_at', { ascending: false });
-      if (data && data.length > 0 && !error) setBlogPosts(data);
+      if (data && !error) setBlogPosts(data);
     } catch {
       console.log('Bloglar yüklendi');
     }
@@ -459,7 +435,6 @@ export default function Home() {
     return Array.from(conversationsMap.values());
   }, [adminMessages]);
 
-  // Admin İçin Danışan Listesi (Hedef/Ödev Ataması Yapabilmek İçin)
   const uniqueClients = useMemo(() => {
     const map = new Map<string, string>();
     adminAppointments.forEach(a => { if (a.client_id) map.set(a.client_id, a.client_name); });
@@ -473,18 +448,72 @@ export default function Home() {
       .replace(/[^a-z0-9 -]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-');
   };
 
+  // Blog Yazısı Kaydet (Hem Yeni Ekleme Hem Güncelleme)
   const handleSavePost = async (e: React.FormEvent) => {
     e.preventDefault();
     setBlogStatus('loading');
-    const { data, error } = await supabase.from('posts').insert([blogForm]).select();
 
-    if (!error && data) {
-      setBlogPosts([data[0], ...blogPosts]);
-      setBlogStatus('success');
-      setBlogForm({ title: '', slug: '', category: 'Yetişkin Terapisi', excerpt: '', content: '', read_time: '4 dk okuma' });
-      setTimeout(() => setBlogStatus('idle'), 2000);
+    if (editingPostId) {
+      // Düzenleme Modu
+      const { data, error } = await supabase
+        .from('posts')
+        .update(blogForm)
+        .eq('id', editingPostId)
+        .select();
+
+      if (!error && data) {
+        setBlogPosts(blogPosts.map(p => p.id === editingPostId ? data[0] : p));
+        setBlogStatus('success');
+        setEditingPostId(null);
+        setBlogForm({ title: '', slug: '', category: 'Yetişkin Terapisi', excerpt: '', content: '', read_time: '4 dk okuma' });
+        setTimeout(() => setBlogStatus('idle'), 2000);
+      } else {
+        setBlogStatus('error');
+      }
     } else {
-      setBlogStatus('error');
+      // Yeni Ekleme Modu
+      const { data, error } = await supabase.from('posts').insert([blogForm]).select();
+
+      if (!error && data) {
+        setBlogPosts([data[0], ...blogPosts]);
+        setBlogStatus('success');
+        setBlogForm({ title: '', slug: '', category: 'Yetişkin Terapisi', excerpt: '', content: '', read_time: '4 dk okuma' });
+        setTimeout(() => setBlogStatus('idle'), 2000);
+      } else {
+        setBlogStatus('error');
+      }
+    }
+  };
+
+  // Blog Düzenlemeye Başla
+  const startEditPost = (post: any) => {
+    setEditingPostId(post.id);
+    setBlogForm({
+      title: post.title,
+      slug: post.slug || generateSlug(post.title),
+      category: post.category || 'Yetişkin Terapisi',
+      excerpt: post.excerpt || '',
+      content: post.content || '',
+      read_time: post.read_time || '4 dk okuma'
+    });
+  };
+
+  // Blog Düzenlemeyi İptal Et
+  const cancelEditPost = () => {
+    setEditingPostId(null);
+    setBlogForm({ title: '', slug: '', category: 'Yetişkin Terapisi', excerpt: '', content: '', read_time: '4 dk okuma' });
+  };
+
+  // Blog Sil
+  const handleDeletePost = async (id: string) => {
+    if (!confirm('Bu yazıyı silmek istediğinizden emin misiniz?')) return;
+
+    const { error } = await supabase.from('posts').delete().eq('id', id);
+    if (!error) {
+      setBlogPosts(blogPosts.filter(p => p.id !== id));
+      if (editingPostId === id) cancelEditPost();
+    } else {
+      alert('Yazı silinirken bir hata oluştu: ' + error.message);
     }
   };
 
@@ -658,7 +687,7 @@ export default function Home() {
         )}
       </header>
 
-      {/* HERO BÖLÜMÜ */}
+      {/* HERO */}
       <section className="relative pt-16 pb-20 sm:pt-24 sm:pb-28 overflow-hidden">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-8">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#E5ECE9] border border-[#446A5E]/20 text-[#446A5E] text-xs font-semibold">
@@ -852,36 +881,41 @@ export default function Home() {
             <span className="text-xs font-bold text-[#446A5E] uppercase tracking-widest">Psikoloji Kütüphanesi</span>
             <h2 className="text-3xl font-extrabold text-[#192923]">Yazılar & Makaleler</h2>
           </div>
-          <div className="grid md:grid-cols-3 gap-8">
-            {blogPosts.map((post) => (
-              <Link
-                key={post.id}
-                href={`/blog/${post.slug || post.id}`}
-                className="bg-[#FAF7F2] rounded-3xl p-6 border border-[#E8DFD8] hover:shadow-lg transition-all flex flex-col justify-between group"
-              >
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center text-xs text-stone-500">
-                    <span className="font-bold text-[#446A5E] bg-[#E5ECE9] px-2.5 py-1 rounded-full text-[10px]">
-                      {post.category || 'Psikoloji'}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Clock className="w-3 h-3" /> {post.read_time || '4 dk okuma'}
-                    </span>
+          
+          {blogPosts.length === 0 ? (
+            <p className="text-stone-400 py-8 text-sm">Henüz yayınlanmış bir makale bulunmuyor.</p>
+          ) : (
+            <div className="grid md:grid-cols-3 gap-8">
+              {blogPosts.map((post) => (
+                <Link
+                  key={post.id}
+                  href={`/blog/${post.slug || post.id}`}
+                  className="bg-[#FAF7F2] rounded-3xl p-6 border border-[#E8DFD8] hover:shadow-lg transition-all flex flex-col justify-between group"
+                >
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center text-xs text-stone-500">
+                      <span className="font-bold text-[#446A5E] bg-[#E5ECE9] px-2.5 py-1 rounded-full text-[10px]">
+                        {post.category || 'Psikoloji'}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-3 h-3" /> {post.read_time || '4 dk okuma'}
+                      </span>
+                    </div>
+                    <h3 className="text-lg font-bold text-[#192923] group-hover:text-[#446A5E] transition-colors leading-snug">
+                      {post.title}
+                    </h3>
+                    <p className="text-xs text-stone-600 line-clamp-3 leading-relaxed">
+                      {post.excerpt}
+                    </p>
                   </div>
-                  <h3 className="text-lg font-bold text-[#192923] group-hover:text-[#446A5E] transition-colors leading-snug">
-                    {post.title}
-                  </h3>
-                  <p className="text-xs text-stone-600 line-clamp-3 leading-relaxed">
-                    {post.excerpt}
-                  </p>
-                </div>
-                <div className="pt-4 mt-4 border-t border-[#E8DFD8] flex items-center justify-between text-xs font-bold text-[#446A5E]">
-                  <span>Makaleyi Oku</span>
-                  <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-                </div>
-              </Link>
-            ))}
-          </div>
+                  <div className="pt-4 mt-4 border-t border-[#E8DFD8] flex items-center justify-between text-xs font-bold text-[#446A5E]">
+                    <span>Makaleyi Oku</span>
+                    <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
@@ -1092,7 +1126,7 @@ export default function Home() {
             {/* Çekmece İçeriği */}
             <div className="flex-1 overflow-y-auto p-5 text-xs">
               
-              {/* 1. GİRİŞ YAPILMAMIŞSA (AUTH FORMLARI) */}
+              {/* 1. GİRİŞ YAPILMAMIŞSA */}
               {!currentUser && (
                 <div className="space-y-4 pt-4">
                   {authError && (
@@ -1216,10 +1250,9 @@ export default function Home() {
                 </div>
               )}
 
-              {/* 2. DANIŞAN GİRİŞİ YAPILDIYSA (YENİ 4'LÜ MİMARİ) */}
+              {/* 2. DANIŞAN GİRİŞİ YAPILDIYSA */}
               {currentUser && !isAdmin && (
                 <div className="space-y-4">
-                  {/* Danışan Sekme Butonları */}
                   <div className="grid grid-cols-4 bg-[#FAF7F2] p-1 rounded-xl border border-[#E8DFD8] text-[10px] font-bold text-center">
                     <button
                       onClick={() => setClientTab('appointments')}
@@ -1247,7 +1280,6 @@ export default function Home() {
                     </button>
                   </div>
 
-                  {/* SEKME 1: RANDEVULAR */}
                   {clientTab === 'appointments' && (
                     <div className="space-y-3">
                       <div className="flex justify-between items-center">
@@ -1301,10 +1333,8 @@ export default function Home() {
                     </div>
                   )}
 
-                  {/* SEKME 2: TERAPİ YOLCULUĞUM (SÜRECİM) */}
                   {clientTab === 'journey' && (
                     <div className="space-y-4">
-                      {/* Seans İlerleme Özeti */}
                       <div className="p-4 rounded-2xl bg-gradient-to-br from-[#192923] to-[#2B453B] text-white space-y-2">
                         <div className="flex justify-between items-center">
                           <span className="text-xs font-bold text-[#D6AFA3]">Klinik Yolculuk</span>
@@ -1318,7 +1348,6 @@ export default function Home() {
                         </p>
                       </div>
 
-                      {/* Ödevler ve Hedefler Listesi */}
                       <div className="space-y-2.5">
                         <div className="flex items-center gap-1.5 text-xs font-bold text-[#192923]">
                           <ListTodo className="w-4 h-4 text-[#446A5E]" />
@@ -1371,7 +1400,6 @@ export default function Home() {
                     </div>
                   )}
 
-                  {/* SEKME 3: MESAJLAR */}
                   {clientTab === 'messages' && (
                     <div className="flex flex-col h-[450px]">
                       <div className="flex-1 overflow-y-auto space-y-2 pr-1">
@@ -1398,7 +1426,6 @@ export default function Home() {
                     </div>
                   )}
 
-                  {/* SEKME 4: HESABIM & GÜVENLİK */}
                   {clientTab === 'account' && (
                     <div className="space-y-4">
                       <div className="p-4 rounded-2xl bg-[#FAF7F2] border border-[#E8DFD8] space-y-2">
@@ -1410,7 +1437,6 @@ export default function Home() {
                         </div>
                       </div>
 
-                      {/* Şifre Değiştirme */}
                       <div className="p-4 rounded-2xl bg-white border border-[#E8DFD8] space-y-3">
                         <div className="flex items-center gap-2">
                           <KeyRound className="w-4 h-4 text-[#446A5E]" />
@@ -1487,7 +1513,7 @@ export default function Home() {
                       onClick={() => setAdminTab('posts')}
                       className={`py-2 rounded-lg transition-all ${adminTab === 'posts' ? 'bg-[#446A5E] text-white' : 'text-stone-600'}`}
                     >
-                      Yazı Ekle
+                      Yazılar ({blogPosts.length})
                     </button>
                   </div>
 
@@ -1532,7 +1558,7 @@ export default function Home() {
                     </div>
                   )}
 
-                  {/* SEKME 2: INSTAGRAM DM FORMATINDA ADMIN MESAJ KUTUSU */}
+                  {/* SEKME 2: MESAJLAR */}
                   {adminTab === 'messages' && (
                     <div className="flex flex-col h-[460px]">
                       {!selectedClient ? (
@@ -1619,7 +1645,7 @@ export default function Home() {
                     </div>
                   )}
 
-                  {/* SEKME 3: DANIŞANA ÖDEV / HEDEF TANIMLAMA */}
+                  {/* SEKME 3: ÖDEV / HEDEF */}
                   {adminTab === 'tasks' && (
                     <div className="space-y-4">
                       <div className="p-3.5 bg-[#FAF7F2] rounded-2xl border border-[#E8DFD8] space-y-3">
@@ -1648,7 +1674,7 @@ export default function Home() {
 
                           <textarea
                             rows={2}
-                            placeholder="Açıklama / Danışana Not (Örn: Hafta içi kaygı hissettiğiniz 2 anı not edin)"
+                            placeholder="Açıklama / Danışana Not"
                             value={taskForm.description}
                             onChange={(e) => setTaskForm({ ...taskForm, description: e.target.value })}
                             className="w-full p-2 bg-white rounded-lg border text-xs"
@@ -1673,7 +1699,6 @@ export default function Home() {
                         </form>
                       </div>
 
-                      {/* Önceden Tanımlananlar */}
                       <div className="space-y-2">
                         <p className="font-bold text-[#192923] text-xs">Atanan Ödevler ({adminTasks.length})</p>
                         <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
@@ -1693,24 +1718,124 @@ export default function Home() {
                     </div>
                   )}
 
-                  {/* SEKME 4: BLOG YAZISI EKLEME */}
+                  {/* SEKME 4: BLOG YAZILARI YÖNETİMİ (EKLE, DÜZENLE, SİL) */}
                   {adminTab === 'posts' && (
-                    <div className="space-y-3">
-                      <p className="font-bold text-[#192923]">Yeni Blog Yazısı Ekle</p>
-                      {blogStatus === 'success' && <p className="text-emerald-700 font-bold text-[10px]">Yazı yayınlandı!</p>}
-                      <form onSubmit={handleSavePost} className="space-y-2">
-                        <input type="text" required value={blogForm.title} onChange={(e) => setBlogForm({ ...blogForm, title: e.target.value, slug: generateSlug(e.target.value) })} placeholder="Başlık" className="w-full p-2 bg-[#FAF7F2] rounded-lg border text-xs" />
-                        <select value={blogForm.category} onChange={(e) => setBlogForm({ ...blogForm, category: e.target.value })} className="w-full p-2 bg-[#FAF7F2] rounded-lg border text-xs">
-                          <option value="Yetişkin Terapisi">Yetişkin Terapisi</option>
-                          <option value="Çocuk & Oyun">Çocuk & Oyun</option>
-                          <option value="Klinik Değerlendirme">Klinik Değerlendirme</option>
-                        </select>
-                        <textarea rows={2} required value={blogForm.excerpt} onChange={(e) => setBlogForm({ ...blogForm, excerpt: e.target.value })} placeholder="Kısa Özet" className="w-full p-2 bg-[#FAF7F2] rounded-lg border text-xs" />
-                        <textarea rows={4} required value={blogForm.content} onChange={(e) => setBlogForm({ ...blogForm, content: e.target.value })} placeholder="İçerik..." className="w-full p-2 bg-[#FAF7F2] rounded-lg border text-xs" />
-                        <button type="submit" disabled={blogStatus === 'loading'} className="w-full py-2 bg-[#446A5E] text-white font-bold rounded-lg text-xs cursor-pointer">
-                          {blogStatus === 'loading' ? 'Kaydediliyor...' : 'Yayınla'}
-                        </button>
-                      </form>
+                    <div className="space-y-4">
+                      
+                      {/* Ekleme / Düzenleme Formu */}
+                      <div className="p-3.5 bg-[#FAF7F2] rounded-2xl border border-[#E8DFD8] space-y-2.5">
+                        <div className="flex justify-between items-center">
+                          <p className="font-bold text-[#192923] text-xs">
+                            {editingPostId ? 'Yazıyı Düzenle' : 'Yeni Blog Yazısı Ekle'}
+                          </p>
+                          {editingPostId && (
+                            <button 
+                              type="button" 
+                              onClick={cancelEditPost} 
+                              className="text-[10px] text-red-600 hover:underline font-bold"
+                            >
+                              İptal Et
+                            </button>
+                          )}
+                        </div>
+
+                        {blogStatus === 'success' && (
+                          <p className="text-emerald-700 font-bold text-[10px]">
+                            {editingPostId ? 'Yazı güncellendi!' : 'Yazı yayınlandı!'}
+                          </p>
+                        )}
+                        
+                        <form onSubmit={handleSavePost} className="space-y-2">
+                          <input 
+                            type="text" 
+                            required 
+                            value={blogForm.title} 
+                            onChange={(e) => setBlogForm({ ...blogForm, title: e.target.value, slug: generateSlug(e.target.value) })} 
+                            placeholder="Başlık" 
+                            className="w-full p-2 bg-white rounded-lg border text-xs" 
+                          />
+                          <div className="grid grid-cols-2 gap-2">
+                            <select 
+                              value={blogForm.category} 
+                              onChange={(e) => setBlogForm({ ...blogForm, category: e.target.value })} 
+                              className="w-full p-2 bg-white rounded-lg border text-xs"
+                            >
+                              <option value="Yetişkin Terapisi">Yetişkin Terapisi</option>
+                              <option value="Çocuk & Oyun">Çocuk & Oyun</option>
+                              <option value="Klinik Değerlendirme">Klinik Değerlendirme</option>
+                            </select>
+                            <input 
+                              type="text" 
+                              required 
+                              value={blogForm.read_time} 
+                              onChange={(e) => setBlogForm({ ...blogForm, read_time: e.target.value })} 
+                              placeholder="Örn: 4 dk okuma" 
+                              className="w-full p-2 bg-white rounded-lg border text-xs" 
+                            />
+                          </div>
+                          <textarea 
+                            rows={2} 
+                            required 
+                            value={blogForm.excerpt} 
+                            onChange={(e) => setBlogForm({ ...blogForm, excerpt: e.target.value })} 
+                            placeholder="Kısa Özet" 
+                            className="w-full p-2 bg-white rounded-lg border text-xs" 
+                          />
+                          <textarea 
+                            rows={4} 
+                            required 
+                            value={blogForm.content} 
+                            onChange={(e) => setBlogForm({ ...blogForm, content: e.target.value })} 
+                            placeholder="İçerik..." 
+                            className="w-full p-2 bg-white rounded-lg border text-xs" 
+                          />
+                          <button 
+                            type="submit" 
+                            disabled={blogStatus === 'loading'} 
+                            className="w-full py-2 bg-[#446A5E] text-white font-bold rounded-lg text-xs cursor-pointer hover:bg-[#335047] transition-colors"
+                          >
+                            {blogStatus === 'loading' 
+                              ? 'Kaydediliyor...' 
+                              : (editingPostId ? 'Değişiklikleri Güncelle' : 'Yayınla')}
+                          </button>
+                        </form>
+                      </div>
+
+                      {/* Mevcut Yazıların Listesi (Düzenle & Sil Butonları) */}
+                      <div className="space-y-2">
+                        <p className="font-bold text-[#192923] text-xs">Mevcut Makaleler ({blogPosts.length})</p>
+                        {blogPosts.length === 0 ? (
+                          <p className="text-stone-400 text-center py-4 text-[11px]">Kayıtlı makale yok.</p>
+                        ) : (
+                          <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                            {blogPosts.map((post) => (
+                              <div key={post.id} className="p-3 bg-[#FAF7F2] rounded-xl border border-[#E8DFD8] flex items-center justify-between gap-2">
+                                <div className="truncate flex-1">
+                                  <p className="font-bold text-xs text-[#192923] truncate">{post.title}</p>
+                                  <p className="text-[10px] text-stone-500 truncate">{post.category || 'Psikoloji'}</p>
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <button
+                                    onClick={() => startEditPost(post)}
+                                    title="Yazıyı Düzenle"
+                                    className="p-1.5 rounded-lg bg-white border border-[#E8DFD8] hover:bg-[#E5ECE9] text-[#446A5E] cursor-pointer transition-colors"
+                                  >
+                                    <Pencil className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeletePost(post.id)}
+                                    title="Yazıyı Sil"
+                                    className="p-1.5 rounded-lg bg-white border border-[#E8DFD8] hover:bg-red-50 text-red-600 cursor-pointer transition-colors"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
                     </div>
                   )}
                 </div>
