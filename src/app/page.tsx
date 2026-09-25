@@ -741,65 +741,100 @@ export default function Home() {
         </div>
       </section>
 
-      {/* HAKKIMDA */}
-      <section id="hakkimda" className="py-20 bg-white border-y border-[#E8DFD8]">
+      {/* HAKKIMDA BÖLÜMÜ */}
+      <section id="hakkimda" className="py-20 sm:py-28 bg-white border-y border-[#E8DFD8]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-12 gap-12 items-center">
-            <div className="lg:col-span-6 space-y-6">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#F5EAE5] text-[#8C7A6B] text-xs font-bold uppercase tracking-wider">
-                <GraduationCap className="w-4 h-4 text-[#D6AFA3]" />
-                <span>Akademik Geçmiş & Vizyon</span>
-              </div>
-              <h2 className="text-3xl sm:text-4xl font-extrabold text-[#192923] leading-tight">
-                Her bireyin ve çocuğun kendi iyileşme potansiyeli vardır.
-              </h2>
-              <p className="text-stone-600 text-sm sm:text-base leading-relaxed">
-                Uluslararası Kıbrıs Üniversitesi Psikoloji lisans programını 3.65 onur derecesiyle tamamladıktan sonra, aynı üniversitede Klinik Psikoloji Yüksek Lisans eğitimimi başarıyla tamamladım. Bilişsel Davranışçı Terapi ekolü çerçevesinde bireylerin düşünce kalıplarını yeniden yapılandırmalarına eşlik ediyorum.
-              </p>
-              <div className="grid sm:grid-cols-2 gap-4 pt-2">
-                <div className="p-4 rounded-2xl bg-[#FAF7F2] border border-[#E8DFD8] flex items-start gap-3">
-                  <Award className="w-5 h-5 text-[#446A5E] shrink-0 mt-0.5" />
-                  <div>
-                    <h4 className="text-xs font-bold text-[#192923]">BDT Uygulayıcısı</h4>
-                    <p className="text-[11px] text-stone-500 mt-0.5">Bilişsel Davranışçı Psikoterapiler Derneği</p>
-                  </div>
-                </div>
-                <div className="p-4 rounded-2xl bg-[#FAF7F2] border border-[#E8DFD8] flex items-start gap-3">
-                  <BookOpen className="w-5 h-5 text-[#D6AFA3] shrink-0 mt-0.5" />
-                  <div>
-                    <h4 className="text-xs font-bold text-[#192923]">Oyun Terapisi</h4>
-                    <p className="text-[11px] text-stone-500 mt-0.5">Çocuk Merkezli & Deneyimsel Oyun Ekolü</p>
+          <div className="grid lg:grid-cols-12 gap-12 lg:gap-16 items-center">
+            
+            {/* SOL TARAF: MELİKE HANIM GÖRSELİ */}
+            <div className="lg:col-span-5 relative flex justify-center">
+              <div className="relative w-full max-w-sm sm:max-w-md">
+                {/* Arka plan dekoratif pastel gölge/katman */}
+                <div className="absolute -inset-3 bg-[#E5ECE9] rounded-[2.5rem] transform -rotate-2" />
+                <div className="absolute -inset-1 bg-[#D6AFA3]/30 rounded-[2.5rem] transform rotate-1" />
+                
+                {/* Fotoğraf Kutusu */}
+                <div className="relative rounded-[2.2rem] overflow-hidden border-4 border-white shadow-2xl bg-[#FAF7F2] aspect-[3/4]">
+                  <img
+                    src="/melike-ermumcu.jpg"
+                    alt="Klinik Psikolog Melike Ermumcu"
+                    className="w-full h-full object-cover object-top hover:scale-105 transition-transform duration-500"
+                  />
+                  {/* Fotoğrafın altındaki isim & unvan rozeti */}
+                  <div className="absolute bottom-4 inset-x-4 p-4 rounded-2xl bg-[#192923]/85 backdrop-blur-md text-white border border-white/10 flex items-center justify-between">
+                    <div>
+                      <p className="font-extrabold text-sm sm:text-base leading-tight">Melike Ermumcu</p>
+                      <p className="text-[11px] text-[#D6AFA3] font-medium mt-0.5">Uzman Klinik Psikolog</p>
+                    </div>
+                    <div className="w-8 h-8 rounded-full bg-[#446A5E] flex items-center justify-center text-white shrink-0">
+                      <GraduationCap className="w-4 h-4 text-[#FAF7F2]" />
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="lg:col-span-6 bg-[#FAF7F2] p-8 sm:p-10 rounded-3xl border border-[#E8DFD8] space-y-6">
-              <h3 className="text-xl font-bold text-[#192923]">Çalışma İlkelerim</h3>
-              <div className="space-y-4">
-                <div className="flex gap-4">
-                  <div className="w-8 h-8 rounded-xl bg-[#E5ECE9] text-[#446A5E] flex items-center justify-center shrink-0 font-bold text-xs">01</div>
+            {/* SAĞ TARAF: BİYOGRAFİ & ÇALIŞMA VİZYONU */}
+            <div className="lg:col-span-7 space-y-6">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#F5EAE5] text-[#8C7A6B] text-xs font-bold uppercase tracking-wider">
+                <Sparkles className="w-3.5 h-3.5 text-[#D6AFA3]" />
+                <span>Klinik Vizyon & Akademik Geçmiş</span>
+              </div>
+
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-[#192923] leading-tight">
+                Her bireyin ve çocuğun kendi <span className="text-[#446A5E] italic">iyileşme potansiyeli</span> vardır.
+              </h2>
+
+              <div className="space-y-3.5 text-stone-600 text-sm sm:text-base leading-relaxed font-normal">
+                <p>
+                  Merhaba, ben <strong>Klinik Psikolog Melike Ermumcu</strong>. Uluslararası Kıbrıs Üniversitesi Psikoloji lisans programını <strong>3.65 onur derecesiyle</strong> tamamladıktan sonra, aynı üniversitede Klinik Psikoloji Yüksek Lisans eğitimimi başarıyla tamamladım.
+                </p>
+                <p>
+                  Danışanlarımla yürüttüğüm terapi süreçlerinde; yetişkinlerde bilimsel geçerliliği en yüksek ekollerden olan <strong>Bilişsel Davranışçı Terapi (BDT)</strong>, çocuk ve ergenlerde ise onların doğal ifade alanı olan <strong>Deneyimsel ve Çocuk Merkezli Oyun Terapisi</strong> yaklaşımlarını uyguluyorum.
+                </p>
+                <p className="text-xs sm:text-sm text-stone-500 italic border-l-2 border-[#446A5E] pl-3 py-0.5">
+                  &ldquo;Amacım, danışanlarımın içsel kaynaklarını keşfederek düşünce, duygu ve davranış döngülerini daha sağlıklı bir dengede yeniden inşa etmelerine güvenli bir alan açmaktır.&rdquo;
+                </p>
+              </div>
+
+              {/* Sertifikasyon & Uzmanlık Rozetleri */}
+              <div className="grid sm:grid-cols-2 gap-3.5 pt-2">
+                <div className="p-3.5 rounded-2xl bg-[#FAF7F2] border border-[#E8DFD8] flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[#E5ECE9] flex items-center justify-center shrink-0">
+                    <Award className="w-5 h-5 text-[#446A5E]" />
+                  </div>
                   <div>
-                    <h5 className="text-sm font-bold text-[#192923]">Bireye Özgü Yaklaşım</h5>
-                    <p className="text-xs text-stone-600 mt-1">Terapi haritası tamamen kişinin ihtiyaçlarına göre özelleştirilir.</p>
+                    <h4 className="text-xs font-bold text-[#192923]">BDT Uygulayıcısı</h4>
+                    <p className="text-[11px] text-stone-500">Bilişsel Davranışçı Psikoterapiler Derneği</p>
                   </div>
                 </div>
-                <div className="flex gap-4">
-                  <div className="w-8 h-8 rounded-xl bg-[#E5ECE9] text-[#446A5E] flex items-center justify-center shrink-0 font-bold text-xs">02</div>
-                  <div>
-                    <h5 className="text-sm font-bold text-[#192923]">Bilimsel ve Kanıta Dayalı Ekoller</h5>
-                    <p className="text-xs text-stone-600 mt-1">Uluslararası geçerliliği kanıtlanmış psikoterapi modelleri kullanılır.</p>
+
+                <div className="p-3.5 rounded-2xl bg-[#FAF7F2] border border-[#E8DFD8] flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[#F5EAE5] flex items-center justify-center shrink-0">
+                    <BookOpen className="w-5 h-5 text-[#D6AFA3]" />
                   </div>
-                </div>
-                <div className="flex gap-4">
-                  <div className="w-8 h-8 rounded-xl bg-[#E5ECE9] text-[#446A5E] flex items-center justify-center shrink-0 font-bold text-xs">03</div>
                   <div>
-                    <h5 className="text-sm font-bold text-[#192923]">Mutlak Gizlilik</h5>
-                    <p className="text-xs text-stone-600 mt-1">Türk Psikologlar Derneği etik yönetmeliği ilkelerine titizlikle uyulur.</p>
+                    <h4 className="text-xs font-bold text-[#192923]">Oyun Terapisi</h4>
+                    <p className="text-[11px] text-stone-500">Çocuk Merkezli & Deneyimsel Ekol</p>
                   </div>
                 </div>
               </div>
+
+              {/* Temel Çalışma İlkeleri (Mini Bar) */}
+              <div className="pt-4 border-t border-[#E8DFD8] flex flex-wrap gap-4 text-xs font-bold text-[#192923]">
+                <span className="flex items-center gap-1.5 text-[#446A5E]">
+                  <CheckCircle2 className="w-4 h-4" /> Bireye Özgü Harita
+                </span>
+                <span className="flex items-center gap-1.5 text-[#446A5E]">
+                  <CheckCircle2 className="w-4 h-4" /> Kanıta Dayalı Ekoller
+                </span>
+                <span className="flex items-center gap-1.5 text-[#446A5E]">
+                  <CheckCircle2 className="w-4 h-4" /> %100 Etik Gizlilik
+                </span>
+              </div>
+
             </div>
+
           </div>
         </div>
       </section>
