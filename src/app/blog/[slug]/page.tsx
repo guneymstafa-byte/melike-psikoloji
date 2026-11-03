@@ -3,6 +3,9 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { supabase } from '../../../lib/supabase';
+import { connectionMessage, withDeadline } from '../../../lib/network';
+import { useConnectionRecovery } from '../../../lib/use-connection-recovery';
+import { ConnectionNotice } from '../../../components/connection-notice';
 import Link from 'next/link';
 import { ArrowLeft, Clock, Calendar } from 'lucide-react';
 
@@ -21,24 +24,33 @@ export default function BlogPostDetail() {
   const [post, setPost] = useState<PostData | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const [error, setError] = useState('');
+  const [retry, setRetry] = useState(0);
+  const offline = useConnectionRecovery(() => setRetry(value => value + 1));
+  const slug = Array.isArray(params?.slug) ? params.slug[0] : params?.slug;
+
   useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError('');
+    setPost(null);
     async function fetchPost() {
-      if (!params?.slug) return;
-      const slugVal = Array.isArray(params.slug) ? params.slug[0] : params.slug;
-
-      const { data } = await supabase
-        .from('posts')
-        .select('*')
-        .eq('slug', slugVal)
-        .single();
-
-      if (data) {
-        setPost(data as PostData);
+      try {
+        if (!slug) return;
+        const { data, error } = await withDeadline(supabase.from('posts').select('*').eq('slug', slug).eq('published', true).maybeSingle());
+        if (error) throw error;
+        if (active) setPost(data as PostData | null);
+      } catch (error) {
+        if (active) setError(connectionMessage(error));
+      } finally {
+        if (active) setLoading(false);
       }
-      setLoading(false);
     }
-    fetchPost();
-  }, [params]);
+    void fetchPost();
+    return () => { active = false; };
+  }, [slug, retry]);
+
+  if (error || offline) return <main className="min-h-screen bg-[#FAF7F2] p-6"><ConnectionNotice offline={offline} error={error} onRetry={() => setRetry(value => value + 1)} /><Link href="/" className="underline">Ana sayfaya dön</Link></main>;
 
   if (loading) {
     return (

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '../../lib/supabase';
+import { connectionMessage, withDeadline } from '../../lib/network';
 import { Lock, CheckCircle2, AlertCircle, ArrowLeft, Loader2, UserCheck } from 'lucide-react';
 
 export default function SifreYenilePage() {
@@ -20,12 +21,13 @@ export default function SifreYenilePage() {
     // Sayfa açıldığında linkteki oturumu yakala ve hangi kullanıcının şifresinin değiştiğini belirle
     const checkSession = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session }, error } = await withDeadline(supabase.auth.getSession());
+        if (error) throw error;
         if (session?.user?.email) {
           setTargetEmail(session.user.email);
         }
       } catch (err) {
-        console.error("Oturum kontrol hatası:", err);
+        setError(connectionMessage(err));
       } finally {
         setVerifying(false);
       }
@@ -38,6 +40,8 @@ export default function SifreYenilePage() {
           setTargetEmail(session.user.email);
         }
         setVerifying(false);
+      } else if (event === 'SIGNED_OUT') {
+        setTargetEmail(null);
       }
     });
 
@@ -51,6 +55,8 @@ export default function SifreYenilePage() {
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (!targetEmail) { setError('Geçerli bir şifre yenileme bağlantısı bulunamadı. Lütfen yeni bağlantı isteyin.'); return; }
 
     if (password.length < 6) {
       setError('Şifre en az 6 karakter olmalıdır.');
@@ -76,7 +82,7 @@ export default function SifreYenilePage() {
       setSuccess(true);
       // Şifre güncellendikten sonra eski oturumu tamamen temizle ve ana sayfaya yönlendir
       setTimeout(async () => {
-        await supabase.auth.signOut();
+        await supabase.auth.signOut({ scope: 'local' });
         router.push('/');
       }, 2500);
     } catch (err: unknown) {
@@ -118,7 +124,7 @@ export default function SifreYenilePage() {
             </div>
           ) : (
             <p className="text-xs text-stone-500 mt-1">
-              Lütfen hesabınız için kullanmak istediğiniz yeni şifrenizi girin.
+              Bağlantı geçersiz veya süresi dolmuş. Ana sayfadaki Şifremi Unuttum alanından yeni bağlantı isteyin.
             </p>
           )}
         </div>
@@ -172,7 +178,7 @@ export default function SifreYenilePage() {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !targetEmail}
               className="w-full py-3 rounded-xl bg-[#446A5E] hover:bg-[#335047] text-white font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
               {loading && <Loader2 className="w-4 h-4 animate-spin" />}

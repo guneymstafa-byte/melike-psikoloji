@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { 
   HeartHandshake, 
@@ -39,13 +39,27 @@ import {
   Trash2
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import type { User as AuthUser } from '@supabase/supabase-js';
+import { connectionMessage, createResilientFetch, withDeadline } from '../lib/network';
+import { useConnectionRecovery } from '../lib/use-connection-recovery';
+import { ConnectionNotice } from '../components/connection-notice';
 
 export default function Home() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
 
   // Auth & Drawer State
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [connectionError, setConnectionError] = useState('');
+  const [blogError, setBlogError] = useState('');
+  const [actionError, setActionError] = useState('');
+  const [authInfo, setAuthInfo] = useState('');
+  const [actionPending, setActionPending] = useState(false);
+  const actionLock = useRef(false);
+  const userId = useRef<string | null>(null);
+  const loadGeneration = useRef(0);
+  const blogGeneration = useRef(0);
+  const mounted = useRef(true);
   const [profile, setProfile] = useState<any>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [authView, setAuthView] = useState<'login' | 'register' | 'forgot'>('login');
@@ -125,58 +139,107 @@ export default function Home() {
 
   const isAdmin = currentUser?.email === 'melikeermumcu0@gmail.com';
 
+  const offline = useConnectionRecovery(() => {
+    void fetchSession();
+    void fetchLatestPosts();
+  });
+
+  function clearUserData() {
+    loadGeneration.current++;
+    blogGeneration.current++;
+    setBlogPosts([]); setBlogError('');
+    setProfile(null);
+    setMyAppointments([]); setMyMessages([]); setMyTasks([]);
+    setAdminAppointments([]); setAdminMessages([]); setAdminTasks([]);
+    setSelectedClient(null); setClientNewMsg(''); setAdminReply('');
+    setNewPassword(''); setConnectionError(''); setActionError('');
+    setShowBooking(false);
+    setBookingData({ date: '', time: '10:00', service: 'Yüz Yüze Görüşme (Alsancak / İzmir)', note: '' });
+    setTaskForm({ clientId: '', title: '', description: '', type: 'homework' });
+    setEditingPostId(null);
+    setBlogForm({ title: '', slug: '', category: 'Yetişkin Terapisi', excerpt: '', content: '', read_time: '4 dk okuma' });
+  }
+
+  function acceptSession(user: AuthUser | null) {
+    if (!mounted.current) return;
+    if (userId.current !== (user?.id ?? null)) clearUserData();
+    userId.current = user?.id ?? null;
+    setCurrentUser(user);
+  }
+
   useEffect(() => {
-    fetchSession();
-    fetchLatestPosts();
+    mounted.current = true;
+    if (new URLSearchParams(window.location.search).get('panel') === 'account') setDrawerOpen(true);
+    // Keep this callback synchronous: database calls inside it can block auth refresh.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      acceptSession(session?.user ?? null);
+      if (event === 'PASSWORD_RECOVERY') window.location.assign('/sifre-yenile');
+    });
+    void fetchSession();
+    void fetchLatestPosts();
+    return () => { mounted.current = false; loadGeneration.current++; subscription.unsubscribe(); };
   }, []);
 
+  useEffect(() => { if (currentUser) void loadUserData(currentUser); }, [currentUser]);
+  useEffect(() => { void fetchLatestPosts(); }, [currentUser?.id]);
+
+  useEffect(() => {
+    if (!drawerOpen || !currentUser) return;
+    void loadUserData(currentUser);
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible' && navigator.onLine && !actionLock.current) void loadUserData(currentUser);
+    }, 30_000);
+    return () => clearInterval(timer);
+  }, [drawerOpen, currentUser?.id]);
+
   async function fetchSession() {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session?.user) {
-      setCurrentUser(session.user);
-      loadUserData(session.user);
+    try {
+      const { data: { session }, error } = await withDeadline(supabase.auth.getSession());
+      if (error) throw error;
+      acceptSession(session?.user ?? null);
+      if (!session) setConnectionError('');
+    } catch (error) {
+      if (mounted.current) setConnectionError(connectionMessage(error));
     }
   }
 
-  async function loadUserData(user: any) {
-    const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-    if (prof) setProfile(prof);
-
-    if (user.email === 'melikeermumcu0@gmail.com') {
-      const { data: appts } = await supabase.from('appointments').select('*').order('appointment_date', { ascending: true });
-      if (appts) setAdminAppointments(appts);
-
-      const { data: msgs } = await supabase.from('portal_messages').select('*').order('created_at', { ascending: true });
-      if (msgs) setAdminMessages(msgs);
-
-      const { data: tsks } = await supabase.from('client_tasks').select('*').order('created_at', { ascending: false });
-      if (tsks) setAdminTasks(tsks);
-    } else {
-      const { data: appts } = await supabase.from('appointments').select('*').eq('client_id', user.id).order('appointment_date', { ascending: true });
-      if (appts) setMyAppointments(appts);
-
-      const { data: msgs } = await supabase
-        .from('portal_messages')
-        .select('*')
-        .or(`sender_id.eq.${user.id},client_id.eq.${user.id}`)
-        .order('created_at', { ascending: true });
-      if (msgs) setMyMessages(msgs);
-
-      const { data: tsks } = await supabase
-        .from('client_tasks')
-        .select('*')
-        .eq('client_id', user.id)
-        .order('created_at', { ascending: false });
-      if (tsks) setMyTasks(tsks);
+  async function loadUserData(user: AuthUser) {
+    const generation = ++loadGeneration.current;
+    const admin = user.email === 'melikeermumcu0@gmail.com';
+    try {
+      let appointments = supabase.from('appointments').select('*').order('appointment_date', { ascending: true });
+      let messages = supabase.from('portal_messages').select('*').order('created_at', { ascending: true });
+      let tasks = supabase.from('client_tasks').select('*').order('created_at', { ascending: false });
+      if (!admin) {
+        appointments = appointments.eq('client_id', user.id);
+        messages = messages.or(`sender_id.eq.${user.id},client_id.eq.${user.id}`);
+        tasks = tasks.eq('client_id', user.id);
+      }
+      const [prof, appts, msgs, tsks] = await withDeadline(Promise.all([
+        supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(), appointments, messages, tasks,
+      ]));
+      for (const result of [prof, appts, msgs, tsks]) if (result.error) throw result.error;
+      if (!mounted.current || generation !== loadGeneration.current || userId.current !== user.id) return;
+      setProfile(prof.data);
+      (admin ? setAdminAppointments : setMyAppointments)(appts.data ?? []);
+      (admin ? setAdminMessages : setMyMessages)(msgs.data ?? []);
+      (admin ? setAdminTasks : setMyTasks)(tsks.data ?? []);
+      setConnectionError('');
+    } catch (error) {
+      if (mounted.current && generation === loadGeneration.current) setConnectionError(connectionMessage(error));
     }
   }
 
   async function fetchLatestPosts() {
+    const generation = ++blogGeneration.current;
     try {
-      const { data, error } = await supabase.from('posts').select('*').order('created_at', { ascending: false });
-      if (data && !error) setBlogPosts(data);
-    } catch {
-      console.log('Bloglar yüklendi');
+      let query = supabase.from('posts').select('*').order('created_at', { ascending: false });
+      if (!isAdmin) query = query.eq('published', true);
+      const { data, error } = await withDeadline(query);
+      if (error) throw error;
+      if (mounted.current && generation === blogGeneration.current) { setBlogPosts(data ?? []); setBlogError(''); }
+    } catch (error) {
+      if (mounted.current && generation === blogGeneration.current) setBlogError(connectionMessage(error));
     }
   }
 
@@ -186,6 +249,7 @@ export default function Home() {
     setAuthLoading(true);
     setAuthError('');
     setResetSent(false);
+    setAuthInfo('');
 
     try {
       if (authView === 'login') {
@@ -195,8 +259,7 @@ export default function Home() {
         });
         if (error) throw error;
         if (data.user) {
-          setCurrentUser(data.user);
-          loadUserData(data.user);
+          acceptSession(data.user);
           setAuthForm({ fullName: '', phone: '', email: '', password: '' });
         }
       } else if (authView === 'register') {
@@ -209,24 +272,18 @@ export default function Home() {
           }
         });
         if (error) throw error;
-        if (data.user) {
-          await supabase.from('profiles').insert([
-            {
-              id: data.user.id,
-              full_name: authForm.fullName,
-              phone: authForm.phone,
-              role: cleanEmail === 'melikeermumcu0@gmail.com' ? 'admin' : 'client'
-            }
-          ]);
-          setCurrentUser(data.user);
-          loadUserData(data.user);
-          setAuthForm({ fullName: '', phone: '', email: '', password: '' });
+        if (data.session?.user) {
+          const { error: profileError } = await supabase.from('profiles').upsert({
+            id: data.session.user.id, full_name: authForm.fullName, phone: authForm.phone, role: 'client'
+          }, { onConflict: 'id', ignoreDuplicates: true });
+          if (profileError) setAuthInfo('Hesabınız açıldı. Profil bilgileri kaydedilemedi; iletişim bilgileriniz hesap kaydınızdan kullanılacak.');
+          acceptSession(data.session.user);
+        } else {
+          setAuthInfo('Kaydınızı tamamlamak için e-posta kutunuza gelen doğrulama bağlantısını açın, ardından giriş yapın.');
+          setAuthView('login');
         }
+        setAuthForm({ fullName: '', phone: '', email: '', password: '' });
       } else if (authView === 'forgot') {
-        await supabase.auth.signOut();
-        setCurrentUser(null);
-        setProfile(null);
-
         const redirectUrl = typeof window !== 'undefined' 
           ? `${window.location.origin}/sifre-yenile` 
           : 'https://melike-psikoloji-rhjm.vercel.app/sifre-yenile';
@@ -240,22 +297,39 @@ export default function Home() {
         setResetSent(true);
       }
     } catch (err: unknown) {
-      if (err instanceof Error) {
-        setAuthError(err.message === 'Invalid login credentials' ? 'E-posta adresi veya şifre hatalı.' : err.message);
-      } else {
-        setAuthError('İşlem yapılırken bir hata oluştu.');
-      }
+      setAuthError(connectionMessage(err));
     } finally {
       setAuthLoading(false);
     }
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    setCurrentUser(null);
-    setProfile(null);
+    const { error } = await supabase.auth.signOut({ scope: 'local' });
+    if (error) throw error;
+    acceptSession(null);
     setDrawerOpen(false);
   };
+
+  async function runAction(action: () => Promise<void>) {
+    if (actionLock.current) return;
+    setActionError('');
+    if (!navigator.onLine) {
+      setActionError('İnternet bağlantısı yok. Bilgileriniz bu ekranda korunuyor.');
+      return;
+    }
+    actionLock.current = true;
+    setActionPending(true);
+    loadGeneration.current++;
+    try { await action(); }
+    catch (error) { setActionError(connectionMessage(error)); }
+    finally {
+      actionLock.current = false;
+      setActionPending(false);
+      setBookingStatus(value => value === 'loading' ? 'idle' : value);
+      setBlogStatus(value => value === 'loading' ? 'error' : value);
+      setChangePassStatus(value => value === 'loading' ? 'error' : value);
+    }
+  }
 
   // Danışan Kendi Şifresini Değiştirme
   const handleChangePassword = async (e: React.FormEvent) => {
@@ -283,7 +357,7 @@ export default function Home() {
     const { error } = await supabase
       .from('client_tasks')
       .update({ is_completed: !currentStatus })
-      .eq('id', taskId);
+      .eq('id', taskId).select('id').single().throwOnError();
 
     if (!error) {
       setMyTasks(myTasks.map(t => t.id === taskId ? { ...t, is_completed: !currentStatus } : t));
@@ -311,10 +385,10 @@ export default function Home() {
           status: 'pending',
           note: bookingData.note
         }
-      ]).select();
+      ]).select().throwOnError();
 
       if (error) {
-        alert('Randevu oluşturulamadı: ' + error.message);
+        alert(connectionMessage(error));
         setBookingStatus('idle');
         return;
       }
@@ -334,7 +408,7 @@ export default function Home() {
         }, 1200);
       }
     } catch (err) {
-      console.error(err);
+      setActionError(connectionMessage(err));
       setBookingStatus('idle');
     }
   };
@@ -353,9 +427,9 @@ export default function Home() {
         sender_role: 'client',
         message: clientNewMsg.trim()
       }
-    ]).select();
+    ]).select().throwOnError();
 
-    if (!error && data) {
+    if (!error && data?.length) {
       setMyMessages([...myMessages, data[0]]);
       setClientNewMsg('');
     }
@@ -363,7 +437,7 @@ export default function Home() {
 
   // Yönetici Randevu İşlemleri
   const handleUpdateApptStatus = async (id: string, status: 'confirmed' | 'cancelled') => {
-    const { error } = await supabase.from('appointments').update({ status }).eq('id', id);
+    const { error } = await supabase.from('appointments').update({ status }).eq('id', id).select('id').single().throwOnError();
     if (!error) {
       setAdminAppointments(adminAppointments.map(a => a.id === id ? { ...a, status } : a));
     }
@@ -372,7 +446,7 @@ export default function Home() {
   // Yönetici Seçili Danışana Özel Yanıt Gönderme
   const handleSendAdminReply = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!adminReply.trim() || !selectedClient) return;
+    if (!adminReply.trim() || !selectedClient || !currentUser) return;
 
     const { data, error } = await supabase.from('portal_messages').insert([
       {
@@ -382,9 +456,9 @@ export default function Home() {
         sender_role: 'admin',
         message: adminReply.trim()
       }
-    ]).select();
+    ]).select().throwOnError();
 
-    if (!error && data) {
+    if (!error && data?.length) {
       setAdminMessages([...adminMessages, data[0]]);
       setAdminReply('');
     }
@@ -403,9 +477,9 @@ export default function Home() {
         type: taskForm.type,
         is_completed: false
       }
-    ]).select();
+    ]).select().throwOnError();
 
-    if (!error && data) {
+    if (!error && data?.length) {
       setAdminTasks([data[0], ...adminTasks]);
       setTaskForm({ clientId: '', title: '', description: '', type: 'homework' });
       alert('Ödev/Hedef danışana başarıyla tanımlandı.');
@@ -459,9 +533,9 @@ export default function Home() {
         .from('posts')
         .update(blogForm)
         .eq('id', editingPostId)
-        .select();
+        .select().throwOnError();
 
-      if (!error && data) {
+      if (!error && data?.length) {
         setBlogPosts(blogPosts.map(p => p.id === editingPostId ? data[0] : p));
         setBlogStatus('success');
         setEditingPostId(null);
@@ -472,9 +546,9 @@ export default function Home() {
       }
     } else {
       // Yeni Ekleme Modu
-      const { data, error } = await supabase.from('posts').insert([blogForm]).select();
+      const { data, error } = await supabase.from('posts').insert([blogForm]).select().throwOnError();
 
-      if (!error && data) {
+      if (!error && data?.length) {
         setBlogPosts([data[0], ...blogPosts]);
         setBlogStatus('success');
         setBlogForm({ title: '', slug: '', category: 'Yetişkin Terapisi', excerpt: '', content: '', read_time: '4 dk okuma' });
@@ -508,12 +582,12 @@ export default function Home() {
   const handleDeletePost = async (id: string) => {
     if (!confirm('Bu yazıyı silmek istediğinizden emin misiniz?')) return;
 
-    const { error } = await supabase.from('posts').delete().eq('id', id);
+    const { error } = await supabase.from('posts').delete().eq('id', id).select('id').single().throwOnError();
     if (!error) {
       setBlogPosts(blogPosts.filter(p => p.id !== id));
       if (editingPostId === id) cancelEditPost();
     } else {
-      alert('Yazı silinirken bir hata oluştu: ' + error.message);
+      alert(connectionMessage(error));
     }
   };
 
@@ -522,7 +596,7 @@ export default function Home() {
     e.preventDefault();
     setFormStatus('loading');
     try {
-      const res = await fetch('/api/appointment', {
+      const res = await createResilientFetch(fetch, 40_000)('/api/appointment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
@@ -586,6 +660,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#FAF7F2] text-[#192923] font-sans selection:bg-[#D6AFA3] selection:text-white relative">
+      <ConnectionNotice offline={offline} error={connectionError || actionError || blogError} onRetry={() => { setActionError(''); void fetchSession(); void fetchLatestPosts(); }} />
       
       {/* ÜST BİLGİ ŞERİDİ */}
       <div className="bg-[#192923] text-[#FAF7F2]/80 text-xs py-2.5 px-4 border-b border-[#FAF7F2]/10">
@@ -1032,7 +1107,8 @@ export default function Home() {
                   <span>Randevu talebiniz başarıyla iletildi. En kısa sürede sizinle iletişime geçilecektir.</span>
                 </div>
               )}
-              <form onSubmit={handleFormSubmit} className="space-y-4">
+              {formStatus === 'error' && <p role="alert" className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">Talebinizin iletildiği doğrulanamadı. Yazdıklarınız korunuyor. Yeniden göndermeden önce telefon veya WhatsApp üzerinden teyit edebilirsiniz.</p>}
+              <form onSubmit={(e) => { e.preventDefault(); void runAction(() => handleFormSubmit(e)); }} className="space-y-4">
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-[#192923] mb-1">Adınız Soyadınız *</label>
@@ -1148,7 +1224,7 @@ export default function Home() {
 
               <div className="flex items-center gap-2">
                 {currentUser && (
-                  <button onClick={handleLogout} title="Çıkış Yap" className="p-1.5 rounded-lg bg-white/10 hover:bg-red-500/20 text-stone-300 hover:text-red-300 transition-colors cursor-pointer">
+                  <button onClick={() => void runAction(handleLogout)} title="Çıkış Yap" className="p-1.5 rounded-lg bg-white/10 hover:bg-red-500/20 text-stone-300 hover:text-red-300 transition-colors cursor-pointer">
                     <LogOut className="w-4 h-4" />
                   </button>
                 )}
@@ -1158,6 +1234,8 @@ export default function Home() {
               </div>
             </div>
 
+            <ConnectionNotice offline={offline} error={connectionError || actionError || blogError} onRetry={() => { setActionError(''); void fetchSession(); void fetchLatestPosts(); }} />
+            {actionPending && <p role="status" className="px-5 py-2 text-xs text-[#446A5E]">İşleminiz sürüyor…</p>}
             {/* Çekmece İçeriği */}
             <div className="flex-1 overflow-y-auto p-5 text-xs">
               
@@ -1171,6 +1249,7 @@ export default function Home() {
                     </div>
                   )}
 
+                  {authInfo && <p role="status" className="rounded-xl bg-[#E5ECE9] p-3 text-sm text-[#446A5E]">{authInfo}</p>}
                   {resetSent && (
                     <div className="p-4 rounded-2xl bg-[#E5ECE9] border border-[#446A5E]/40 text-[#446A5E] text-xs space-y-1">
                       <p className="font-bold">Sıfırlama bağlantısı gönderildi!</p>
@@ -1178,7 +1257,7 @@ export default function Home() {
                     </div>
                   )}
 
-                  <form onSubmit={handleAuth} className="space-y-3">
+                  <form onSubmit={(e) => { e.preventDefault(); void runAction(() => handleAuth(e)); }} className="space-y-3">
                     {authView === 'register' && (
                       <>
                         <div>
@@ -1328,7 +1407,7 @@ export default function Home() {
                       </div>
 
                       {showBooking && (
-                        <form onSubmit={handleClientBook} className="p-3.5 bg-[#FAF7F2] rounded-2xl border border-[#E8DFD8] space-y-2">
+                        <form onSubmit={(e) => { e.preventDefault(); void runAction(() => handleClientBook(e)); }} className="p-3.5 bg-[#FAF7F2] rounded-2xl border border-[#E8DFD8] space-y-2">
                           <p className="font-bold text-[#192923] text-[11px]">Tarih ve Saat Seçin</p>
                           {bookingStatus === 'success' && <p className="text-emerald-700 font-bold text-[10px]">Talebiniz iletildi!</p>}
                           <div className="grid grid-cols-2 gap-2">
@@ -1399,7 +1478,7 @@ export default function Home() {
                           myTasks.map((t) => (
                             <div 
                               key={t.id} 
-                              onClick={() => toggleTaskCompleted(t.id, t.is_completed)}
+                              onClick={() => void runAction(() => toggleTaskCompleted(t.id, t.is_completed))}
                               className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-start gap-3 ${
                                 t.is_completed 
                                   ? 'bg-[#E5ECE9]/50 border-[#446A5E]/30 opacity-75' 
@@ -1454,7 +1533,7 @@ export default function Home() {
                           })
                         )}
                       </div>
-                      <form onSubmit={handleClientSendMsg} className="pt-2 border-t border-[#E8DFD8] flex gap-2">
+                      <form onSubmit={(e) => { e.preventDefault(); void runAction(() => handleClientSendMsg(e)); }} className="pt-2 border-t border-[#E8DFD8] flex gap-2">
                         <input type="text" required value={clientNewMsg} onChange={(e) => setClientNewMsg(e.target.value)} placeholder="İdari bir not yazın..." className="flex-1 px-3 py-2 bg-[#FAF7F2] rounded-xl border text-xs" />
                         <button type="submit" className="p-2 bg-[#446A5E] text-white rounded-xl cursor-pointer"><Send className="w-3.5 h-3.5" /></button>
                       </form>
@@ -1489,7 +1568,7 @@ export default function Home() {
                           </div>
                         )}
 
-                        <form onSubmit={handleChangePassword} className="space-y-2.5">
+                        <form onSubmit={(e) => { e.preventDefault(); void runAction(() => handleChangePassword(e)); }} className="space-y-2.5">
                           <input
                             type="password"
                             required
@@ -1510,7 +1589,7 @@ export default function Home() {
                       </div>
 
                       <button
-                        onClick={handleLogout}
+                        onClick={() => void runAction(handleLogout)}
                         className="w-full py-3 rounded-2xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-colors"
                       >
                         <LogOut className="w-4 h-4" />
@@ -1577,12 +1656,12 @@ export default function Home() {
                             {appt.note && <p className="text-[11px] text-stone-500 italic bg-white p-2 rounded-lg border">&quot;{appt.note}&quot;</p>}
                             <div className="flex gap-2 pt-1">
                               {appt.status !== 'confirmed' && (
-                                <button onClick={() => handleUpdateApptStatus(appt.id, 'confirmed')} className="flex-1 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] flex items-center justify-center gap-1 cursor-pointer">
+                                <button onClick={() => void runAction(() => handleUpdateApptStatus(appt.id, 'confirmed'))} className="flex-1 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] flex items-center justify-center gap-1 cursor-pointer">
                                   <Check className="w-3 h-3" /> Onayla
                                 </button>
                               )}
                               {appt.status !== 'cancelled' && (
-                                <button onClick={() => handleUpdateApptStatus(appt.id, 'cancelled')} className="flex-1 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-bold text-[10px] flex items-center justify-center gap-1 cursor-pointer">
+                                <button onClick={() => void runAction(() => handleUpdateApptStatus(appt.id, 'cancelled'))} className="flex-1 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-bold text-[10px] flex items-center justify-center gap-1 cursor-pointer">
                                   <X className="w-3 h-3" /> İptal
                                 </button>
                               )}
@@ -1662,7 +1741,7 @@ export default function Home() {
                               })}
                           </div>
 
-                          <form onSubmit={handleSendAdminReply} className="pt-2 border-t border-[#E8DFD8] flex gap-2">
+                          <form onSubmit={(e) => { e.preventDefault(); void runAction(() => handleSendAdminReply(e)); }} className="pt-2 border-t border-[#E8DFD8] flex gap-2">
                             <input
                               type="text"
                               required
@@ -1685,7 +1764,7 @@ export default function Home() {
                     <div className="space-y-4">
                       <div className="p-3.5 bg-[#FAF7F2] rounded-2xl border border-[#E8DFD8] space-y-3">
                         <p className="font-bold text-[#192923] text-xs">Danışana Yeni Ödev/Hedef Tanımla</p>
-                        <form onSubmit={handleCreateTask} className="space-y-2">
+                        <form onSubmit={(e) => { e.preventDefault(); void runAction(() => handleCreateTask(e)); }} className="space-y-2">
                           <select
                             required
                             value={taskForm.clientId}
@@ -1780,7 +1859,7 @@ export default function Home() {
                           </p>
                         )}
                         
-                        <form onSubmit={handleSavePost} className="space-y-2">
+                        <form onSubmit={(e) => { e.preventDefault(); void runAction(() => handleSavePost(e)); }} className="space-y-2">
                           <input 
                             type="text" 
                             required 
@@ -1858,7 +1937,7 @@ export default function Home() {
                                     <Pencil className="w-3.5 h-3.5" />
                                   </button>
                                   <button
-                                    onClick={() => handleDeletePost(post.id)}
+                                    onClick={() => void runAction(() => handleDeletePost(post.id))}
                                     title="Yazıyı Sil"
                                     className="p-1.5 rounded-lg bg-white border border-[#E8DFD8] hover:bg-red-50 text-red-600 cursor-pointer transition-colors"
                                   >
