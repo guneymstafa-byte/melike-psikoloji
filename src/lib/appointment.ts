@@ -2,6 +2,13 @@ export function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
 }
 
+export function appointmentErrorMessage(code?: string) {
+  if (code === 'mail_unavailable') {
+    return 'E-posta hizmeti şu anda kullanılamıyor; talebiniz iletilemedi. Yazdıklarınız bu ekranda korunuyor. Randevu için telefonla bize ulaşabilirsiniz.';
+  }
+  return 'Talebinizin iletildiği doğrulanamadı. Yazdıklarınız bu ekranda korunuyor. Yeniden göndermeden önce telefonla teyit edebilirsiniz.';
+}
+
 export function parseAppointment(input: unknown) {
   if (!input || typeof input !== 'object') return null;
   const data = input as Record<string, unknown>;

@@ -40,7 +40,8 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { User as AuthUser } from '@supabase/supabase-js';
-import { connectionMessage, createResilientFetch, withDeadline } from '../lib/network';
+import { connectionMessage, createReadCoalescer, createResilientFetch, withDeadline } from '../lib/network';
+import { appointmentErrorMessage } from '../lib/appointment';
 import { useConnectionRecovery } from '../lib/use-connection-recovery';
 import { ConnectionNotice } from '../components/connection-notice';
 
@@ -58,6 +59,7 @@ export default function Home() {
   const actionLock = useRef(false);
   const userId = useRef<string | null>(null);
   const loadGeneration = useRef(0);
+  const coalesceRead = useRef(createReadCoalescer());
   const blogGeneration = useRef(0);
   const mounted = useRef(true);
   const [profile, setProfile] = useState<any>(null);
@@ -136,6 +138,7 @@ export default function Home() {
     note: ''
   });
   const [formStatus, setFormStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [formError, setFormError] = useState('');
 
   const isAdmin = currentUser?.email === 'melikeermumcu0@gmail.com';
 
@@ -146,6 +149,7 @@ export default function Home() {
 
   function clearUserData() {
     loadGeneration.current++;
+    coalesceRead.current = createReadCoalescer();
     blogGeneration.current++;
     setBlogPosts([]); setBlogError('');
     setProfile(null);
@@ -197,13 +201,18 @@ export default function Home() {
       const { data: { session }, error } = await withDeadline(supabase.auth.getSession());
       if (error) throw error;
       acceptSession(session?.user ?? null);
+      if (session?.user) void loadUserData(session.user);
       if (!session) setConnectionError('');
     } catch (error) {
       if (mounted.current) setConnectionError(connectionMessage(error));
     }
   }
 
-  async function loadUserData(user: AuthUser) {
+  function loadUserData(user: AuthUser) {
+    return coalesceRead.current(user.id, () => readUserData(user));
+  }
+
+  async function readUserData(user: AuthUser) {
     const generation = ++loadGeneration.current;
     const admin = user.email === 'melikeermumcu0@gmail.com';
     try {
@@ -595,19 +604,23 @@ export default function Home() {
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormStatus('loading');
+    setFormError('');
     try {
       const res = await createResilientFetch(fetch, 40_000)('/api/appointment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
       });
-      if (res.ok) {
+      const result = await res.json().catch(() => null);
+      if (res.ok && result?.success === true) {
         setFormStatus('success');
         setFormData({ name: '', email: '', phone: '', service: 'Yüz Yüze Görüşme (Alsancak / İzmir)', date: '', note: '' });
       } else {
+        setFormError(appointmentErrorMessage(result?.code));
         setFormStatus('error');
       }
     } catch {
+      setFormError(appointmentErrorMessage());
       setFormStatus('error');
     }
   };
@@ -1107,7 +1120,12 @@ export default function Home() {
                   <span>Randevu talebiniz başarıyla iletildi. En kısa sürede sizinle iletişime geçilecektir.</span>
                 </div>
               )}
-              {formStatus === 'error' && <p role="alert" className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">Talebinizin iletildiği doğrulanamadı. Yazdıklarınız korunuyor. Yeniden göndermeden önce telefon veya WhatsApp üzerinden teyit edebilirsiniz.</p>}
+              {formStatus === 'error' && (
+                <div role="alert" className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">
+                  <p>{formError}</p>
+                  <a href="tel:05306560632" className="mt-2 inline-flex items-center gap-2 font-semibold underline"><Phone className="h-4 w-4" />0530 656 06 32</a>
+                </div>
+              )}
               <form onSubmit={(e) => { e.preventDefault(); void runAction(() => handleFormSubmit(e)); }} className="space-y-4">
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div>
@@ -1228,7 +1246,7 @@ export default function Home() {
                     <LogOut className="w-4 h-4" />
                   </button>
                 )}
-                <button onClick={() => setDrawerOpen(false)} className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white cursor-pointer">
+                <button onClick={() => setDrawerOpen(false)} aria-label="Paneli kapat" className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white cursor-pointer">
                   <X className="w-4 h-4" />
                 </button>
               </div>

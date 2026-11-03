@@ -40,6 +40,20 @@ export function createResilientFetch(
 
 export const resilientFetch = createResilientFetch();
 
+/** Coalesce overlapping reads without caching finished results or mixing accounts. */
+export function createReadCoalescer() {
+  const pending = new Map<string, Promise<void>>();
+  return (key: string, read: () => Promise<void>): Promise<void> => {
+    const existing = pending.get(key);
+    if (existing) return existing;
+    const operation = Promise.resolve().then(read).finally(() => {
+      if (pending.get(key) === operation) pending.delete(key);
+    });
+    pending.set(key, operation);
+    return operation;
+  };
+}
+
 export function connectionMessage(error: unknown): string {
   const message = error && typeof error === 'object' && 'message' in error ? String(error.message) : '';
   if (/invalid login credentials/i.test(message)) return 'E-posta adresi veya şifre hatalı.';
