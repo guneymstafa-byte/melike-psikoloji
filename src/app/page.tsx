@@ -1086,15 +1086,6 @@ export default function Home() {
                 </p>
               </div>
               <div className="space-y-4">
-                <div className="flex items-start gap-4 p-4 rounded-2xl bg-[#FAF7F2] border border-[#E8DFD8]">
-                  <MapPin className="w-5 h-5 text-[#446A5E] shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-xs text-stone-500 font-medium">Yüz Yüze Görüşme Adresi</p>
-                    <p className="text-xs sm:text-sm font-bold text-[#192923]">
-                      Alsancak Mah. 1476/1 Sk. No:12 Katipoğlu İşmerkezi Daire:4, Alsancak, Konak / İzmir
-                    </p>
-                  </div>
-                </div>
                 <div className="flex items-center gap-4 p-4 rounded-2xl bg-[#FAF7F2] border border-[#E8DFD8]">
                   <Phone className="w-5 h-5 text-[#446A5E]" />
                   <div>
